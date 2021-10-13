@@ -1,7 +1,9 @@
 package server
 
 import (
+	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"regexp"
@@ -92,26 +94,45 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 	filePath := "./files/" + paths[0] + ".bin"
 	log.Print("Open file")
 	f, err := os.OpenFile(filePath, os.O_RDWR, 0777)
+	defer f.Close()
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	log.Print("open out file")
-	outFile, err := os.OpenFile(paths[0], os.O_RDWR|os.O_CREATE, 0777)
-	if err != nil {
-		log.Print(err)
-		return
-	}
+	log.Print("create pipe")
+	pipeR, pipeW := io.Pipe()
+	log.Print("create multipart")
+	mpWriter := multipart.NewWriter(pipeW)
+	defer mpWriter.Close()
 
-	log.Print("decrypt")
-	err = decrypt(f, outFile, []byte("2A462D4A614E645267556B5870327354"))
-	if err != nil {
-		log.Print(err)
-		return
-	}
+	name := f.Name()[:len(f.Name())-4]
+	go func() {
+		defer pipeW.Close()
+		log.Print("create form file")
+		part, err := mpWriter.CreateFormFile("file", name)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+
+		log.Print("decrypt")
+		err = decrypt(f, part, []byte("2A462D4A614E645267556B5870327354"))
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		log.Print("decryption ended")
+	}()
 	log.Print("serve")
-	http.ServeFile(w, r, paths[0])
+	w.Header().Set("Content-Type", mpWriter.FormDataContentType())
+	_, err = io.Copy(w, pipeR)
+	if err != nil {
+		log.Print(err)
+	}
+	/*if _, err := io.Copy(os.Stdout, pipeR); err != nil {
+		log.Fatal(err)
+	}*/
 	log.Print("served")
 	//Decrypt and servefile
 }
