@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -72,7 +73,7 @@ func encrypt(infile multipart.File, outFile *os.File, key []byte) error {
 	return nil
 }
 
-func decrypt(file, outFile *os.File, key []byte) error {
+func decrypt(file *os.File, part io.Writer, key []byte) error {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err
@@ -108,8 +109,13 @@ func decrypt(file, outFile *os.File, key []byte) error {
 			}
 			length -= int64(n)
 			stream.XORKeyStream(buf, buf[:n])
-			// Write into file
-			outFile.Write(buf[:n])
+
+			if _, err = io.Copy(part, bytes.NewReader(buf[:n])); err != nil {
+				return err
+			}
+			if err != nil {
+				log.Print(err)
+			}
 		}
 
 		if err == io.EOF {
