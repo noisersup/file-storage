@@ -43,9 +43,17 @@ func encrypt(infile multipart.File, outFile *os.File, key []byte) error {
 
 	buf := make([]byte, 1024)
 	stream := cipher.NewCTR(block, iv)
+
+	iterationCount := 1000
+
 	for {
 		n, err := infile.Read(buf)
 		if n > 0 {
+			iterationCount++
+			if iterationCount >= 1000 {
+				fmt.Print(".")
+				iterationCount = 0
+			}
 			stream.XORKeyStream(buf, buf[:n])
 			outFile.Write(buf[:n])
 		}
@@ -58,6 +66,7 @@ func encrypt(infile multipart.File, outFile *os.File, key []byte) error {
 			return fmt.Errorf("Read %d bytes: %v", n, err)
 		}
 	}
+	log.Print("outfile write")
 	outFile.Write(iv)
 
 	return nil
@@ -83,9 +92,16 @@ func decrypt(file, outFile *os.File, key []byte) error {
 
 	buf := make([]byte, 1024)
 	stream := cipher.NewCTR(block, iv)
+	log.Print("actual decryption")
+	iterationCount := 1000
 	for {
 		n, err := file.Read(buf)
 		if n > 0 {
+			iterationCount++
+			if iterationCount >= 1000 {
+				fmt.Print(".")
+				iterationCount = 0
+			}
 			// The last bytes are the IV, don't belong the original message
 			if n > int(length) {
 				n = int(length)
@@ -93,7 +109,6 @@ func decrypt(file, outFile *os.File, key []byte) error {
 			length -= int64(n)
 			stream.XORKeyStream(buf, buf[:n])
 			// Write into file
-			fmt.Print(".")
 			outFile.Write(buf[:n])
 		}
 
