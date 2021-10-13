@@ -17,11 +17,10 @@ func InitServer() {
 	handlers := []struct {
 		regex   *regexp.Regexp
 		methods []string
-		handle  func(w http.ResponseWriter, r *http.Request, args []string)
+		handle  func(w http.ResponseWriter, r *http.Request, paths []string)
 	}{
-		//{regexp.MustCompile(`^/drive$`), []string{"GET"}, s.getTree}, //tree = encrypted map stored in database map["filename"] = encrypted filename
-		{regexp.MustCompile(`^/drive$`), []string{"POST"}, s.uploadFile},
-		{regexp.MustCompile(`^/drive/([^/]+)$`), []string{"GET"}, s.getFile},
+		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
+		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"GET"}, s.getFile},
 	}
 
 	hanFunc := func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +31,7 @@ func InitServer() {
 			}
 			for _, allowed := range handler.methods {
 				if r.Method == allowed {
-					handler.handle(w, r, match)
+					handler.handle(w, r, match[1:])
 					return
 				}
 			}
@@ -44,7 +43,7 @@ func InitServer() {
 	log.Fatal(http.ListenAndServe(":8000", http.HandlerFunc(hanFunc)))
 }
 
-func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, _ []string) {
+func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
 	r.ParseMultipartForm(s.maxUpload)
 
 	file, handler, err := r.FormFile("file")
@@ -57,9 +56,14 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, _ []string) 
 
 	log.Printf("File: %+v\nSize: %+v MIME header: %+v", handler.Filename, handler.Size, handler.Header)
 
-	newFilepath := "./files/" + handler.Filename + ".bin"
+	newFilepath := "./files/" + args[0]
 
-	outfile, err := os.OpenFile(newFilepath, os.O_RDWR|os.O_CREATE, 0777)
+	//Create directory if not exists
+	os.MkdirAll(newFilepath, os.ModePerm)
+
+	newFilepath += "/" + handler.Filename + ".bin"
+
+	outfile, err := os.OpenFile(newFilepath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		log.Print(err)
 		return
@@ -79,15 +83,15 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, _ []string) 
 	}
 }
 
-func (s *Server) getFile(w http.ResponseWriter, r *http.Request, args []string) {
-	filePath := "./files/" + args[1] + ".bin"
+func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
+	filePath := "./files/" + paths[0] + ".bin"
 	f, err := os.OpenFile(filePath, os.O_RDWR, 0777)
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	outFile, err := os.OpenFile(args[1], os.O_RDWR|os.O_CREATE, 0777)
+	outFile, err := os.OpenFile(paths[0], os.O_RDWR|os.O_CREATE, 0777)
 	if err != nil {
 		log.Print(err)
 		return
@@ -98,7 +102,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, args []string) 
 		log.Print(err)
 		return
 	}
-	http.ServeFile(w, r, args[1])
+	http.ServeFile(w, r, paths[0])
 	//Decrypt and servefile
 }
 
