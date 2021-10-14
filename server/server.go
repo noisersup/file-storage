@@ -103,11 +103,13 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 	log.Print("create pipe")
 	pipeR, pipeW := io.Pipe()
 	log.Print("create multipart")
-	mpWriter := multipart.NewWriter(pipeW)
-	defer mpWriter.Close()
+	mpWriter := multipart.NewWriter(w)
+	w.Header().Set("Content-Type", mpWriter.FormDataContentType())
+	//defer pipeR.Close()
 
 	name := f.Name()[:len(f.Name())-4]
 	go func() {
+		defer mpWriter.Close()
 		defer pipeW.Close()
 		log.Print("create form file")
 		part, err := mpWriter.CreateFormFile("file", name)
@@ -124,8 +126,8 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 		}
 		log.Print("decryption ended")
 	}()
+
 	log.Print("serve")
-	w.Header().Set("Content-Type", mpWriter.FormDataContentType())
 	_, err = io.Copy(w, pipeR)
 	if err != nil {
 		log.Print(err)
