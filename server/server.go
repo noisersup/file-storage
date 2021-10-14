@@ -44,7 +44,6 @@ func InitServer() {
 	log.Print("Waiting for connection...")
 	log.Fatal(http.ListenAndServe(":8000", http.HandlerFunc(hanFunc)))
 }
-
 func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
 	log.Print("uploadFile")
 	r.ParseMultipartForm(s.maxUpload)
@@ -93,23 +92,32 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
 	filePath := "./files/" + paths[0] + ".bin"
 
-	serveFile(w, filePath)
-
+	err, status := serveFile(w, filePath)
+	if err != nil {
+		switch status {
+		case http.StatusNotFound:
+			errResponse(w, status, "File not found")
+			break
+		case http.StatusInternalServerError:
+			serverError(w)
+			break
+		default:
+			errResponse(w, status, "")
+		}
+	}
 }
 
-func serveFile(w http.ResponseWriter, path string) {
+func serveFile(w http.ResponseWriter, path string) (error, int) {
 	log.Print("Open file")
 	f, err := os.OpenFile(path, os.O_RDWR, 0777)
 	defer f.Close()
 	if err != nil {
-		log.Print(err)
-		return
+		return err, http.StatusNotFound
 	}
 
 	fi, err := f.Stat()
 	if err != nil {
-		log.Print(err)
-		return
+		return err, http.StatusInternalServerError
 	}
 
 	name := fi.Name()[:len(fi.Name())-4]
@@ -126,10 +134,21 @@ func serveFile(w http.ResponseWriter, path string) {
 	log.Print("decrypt")
 	err = decrypt(f, w, []byte("2A462D4A614E645267556B5870327354"))
 	if err != nil {
-		log.Print(err)
-		return
+		return err, http.StatusInternalServerError
 	}
 	log.Print("decryption ended")
+	return nil, 200
+}
+
+func serverError(w http.ResponseWriter) {
+	errResponse(w, http.StatusInternalServerError, "Server error")
+}
+
+func errResponse(w http.ResponseWriter, status int, msg string) {
+	w.WriteHeader(status)
+	w.Header().Del("Content-Disposition")
+	w.Header().Del("Content-Type")
+	w.Write([]byte("error: " + msg))
 }
 
 // file tree
