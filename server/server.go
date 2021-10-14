@@ -1,11 +1,11 @@
 package server
 
 import (
-	"io"
 	"log"
-	"mime/multipart"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 )
 
@@ -92,51 +92,44 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
 	filePath := "./files/" + paths[0] + ".bin"
+
+	serveFile(w, filePath)
+
+}
+
+func serveFile(w http.ResponseWriter, path string) {
 	log.Print("Open file")
-	f, err := os.OpenFile(filePath, os.O_RDWR, 0777)
+	f, err := os.OpenFile(path, os.O_RDWR, 0777)
 	defer f.Close()
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	log.Print("create pipe")
-	pipeR, pipeW := io.Pipe()
-	log.Print("create multipart")
-	mpWriter := multipart.NewWriter(w)
-	w.Header().Set("Content-Type", mpWriter.FormDataContentType())
-	//defer pipeR.Close()
-
-	name := f.Name()[:len(f.Name())-4]
-	go func() {
-		defer mpWriter.Close()
-		defer pipeW.Close()
-		log.Print("create form file")
-		part, err := mpWriter.CreateFormFile("file", name)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-
-		log.Print("decrypt")
-		err = decrypt(f, part, []byte("2A462D4A614E645267556B5870327354"))
-		if err != nil {
-			log.Print(err)
-			return
-		}
-		log.Print("decryption ended")
-	}()
-
-	log.Print("serve")
-	_, err = io.Copy(w, pipeR)
+	fi, err := f.Stat()
 	if err != nil {
 		log.Print(err)
+		return
 	}
-	/*if _, err := io.Copy(os.Stdout, pipeR); err != nil {
-		log.Fatal(err)
-	}*/
-	log.Print("served")
-	//Decrypt and servefile
+
+	name := fi.Name()[:len(fi.Name())-4]
+
+	if fi.Size() > 100*1000000 {
+		w.Header().Set("Content-Disposition", "attachment; filename="+name)
+	} else {
+		w.Header().Set("Content-Disposition", "inline; filename="+name)
+	}
+
+	ctype := mime.TypeByExtension(filepath.Ext(name))
+	w.Header().Set("Content-Type", ctype)
+
+	log.Print("decrypt")
+	err = decrypt(f, w, []byte("2A462D4A614E645267556B5870327354"))
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	log.Print("decryption ended")
 }
 
 // file tree
