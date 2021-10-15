@@ -13,7 +13,7 @@ import (
 )
 
 // Encrypts a file from multipart reader and stores it in provided directory
-func encrypt(r *multipart.Reader, dir string, key []byte) error {
+func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err

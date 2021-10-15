@@ -59,7 +59,7 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 		return
 	}
 
-	err = encrypt(reader, args[0], []byte("2A462D4A614E645267556B5870327354"))
+	err = encryptMultipart(reader, args[0], []byte("2A462D4A614E645267556B5870327354"))
 	if err != nil {
 		log.Print(err)
 		return
