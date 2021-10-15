@@ -8,15 +8,18 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+
+	"github.com/noisersup/encryptedfs-api/logger"
 )
 
 // Server is a structure responsible for handling all http requests.
 type Server struct {
 	maxUpload int64 //TODO: implement maxuploads
+	l         *logger.Logger
 }
 
-func InitServer() {
-	s := Server{1024 << 20}
+func InitServer(l *logger.Logger) {
+	s := Server{1024 << 20, l}
 
 	//Handle requests
 	handlers := []struct {
@@ -41,18 +44,23 @@ func InitServer() {
 				}
 			}
 		}
+		l.SWarn("hanFunc", "Cannot handle request\n Request: %v", r)
 		http.NotFound(w, r)
 	}
 
-	port := 8000
+	port := 8000 //TODO: add custom port
 
-	log.Printf("Waiting for connection on port: :%d...", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), http.HandlerFunc(hanFunc))) //TODO: add custom port
+	l.Log("Waiting for connection on port: :%d...", port)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), http.HandlerFunc(hanFunc))
+	if err != nil {
+		l.SFatal("InitServer", err.Error())
+	}
 }
 
 // Handler function for POST requests.
 // Encrypts multipart file and store it in provided by user location
 func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
+	s.l.Log("Uploading file...")
 	reader, err := r.MultipartReader()
 	if err != nil {
 		log.Print(err)
@@ -64,11 +72,13 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 		log.Print(err)
 		return
 	}
+	s.l.Log("File uploaded!")
 }
 
 // Handler function for GET requests.
 // Decrypts file and send it in chunks to user
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
+	s.l.Log("Fetching file...")
 	filePath := fmt.Sprintf("./files/%s.bin", paths[0])
 
 	err, status := serveFile(w, filePath)
@@ -76,14 +86,18 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 		switch status {
 		case http.StatusNotFound:
 			errResponse(w, status, "File not found")
+			s.l.Log("File %s not found [error: %s]", filePath, err.Error())
 			break
 		case http.StatusInternalServerError:
 			serverError(w)
+			s.l.SErr("getFile", "Internal error: %s", err.Error())
 			break
 		default:
-			errResponse(w, status, "")
+			serverError(w)
+			s.l.SWarn("getFile", "Undefined error: %s", err.Error())
 		}
 	}
+	s.l.Log("File transfer done!")
 }
 
 // serveFile decrypts file on provided path and writes it's to ResponseWriter

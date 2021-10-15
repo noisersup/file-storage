@@ -1,7 +1,11 @@
 package main
 
-import "github.com/noisersup/encryptedfs-api/server"
+import (
+	"github.com/noisersup/encryptedfs-api/logger"
+	"github.com/noisersup/encryptedfs-api/server"
+)
 
 func main() {
-	server.InitServer()
+	l := logger.Logger{}
+	server.InitServer(&l)
 }

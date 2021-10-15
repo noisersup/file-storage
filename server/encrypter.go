@@ -10,6 +10,9 @@ import (
 	"log"
 	"mime/multipart"
 	"os"
+	"time"
+
+	"github.com/noisersup/encryptedfs-api/logger"
 )
 
 // Encrypts a file from multipart reader and stores it in provided directory
@@ -27,8 +30,6 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	stream := cipher.NewCTR(block, iv)
 	log.Print(buf.Len())
-
-	iterationCount := 0 // For output purposes
 
 	part, err := r.NextPart()
 	if err != nil {
@@ -52,6 +53,7 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
 	if err != nil {
 		return err
 	}
+	l := logger.Logger{}
 
 	defer outFile.Close()
 	partRead = true // part of file was read once (for metadata purposes)
@@ -69,14 +71,18 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
 			rmFile(newFilepath)
 			return fmt.Errorf("Read %d bytes: %v", buf.Len(), err)
 		}
-		iterationCount++            // For output purposes
-		if iterationCount >= 1000 { //
-			fmt.Print(".")     //	//
-			iterationCount = 0 //	//
-		} //						//
+		go func() {
+			for {
+				l.Log("%d", buf.Len())
+				time.Sleep(500 * time.Millisecond)
+			}
+		}()
 
+		l.Log("io.Copy")
 		io.Copy(buf, part)
+		l.Log("XORKeyStream")
 		stream.XORKeyStream(buf.Bytes(), buf.Bytes()[:buf.Len()])
+		l.Log("outFile.Write")
 		outFile.Write(buf.Bytes()[:buf.Len()])
 	}
 	outFile.Write(iv)
@@ -105,18 +111,14 @@ func decrypt(file *os.File, part io.Writer, key []byte) error {
 		return err
 	}
 
+	d := logger.CreateDots(1000)
+
 	buf := make([]byte, 1024)
 	stream := cipher.NewCTR(block, iv)
-	iterationCount := 0 // for output purposes
 	for {
 		n, err := file.Read(buf)
 		if n > 0 {
-			iterationCount++            // for output purposes
-			if iterationCount >= 1000 { //
-				fmt.Print(".")     //	//
-				iterationCount = 0 //	//
-			} // 						//
-
+			d.PrintDots()
 			// IV bytes don't belong the original message
 			if n > int(length) {
 				n = int(length)
