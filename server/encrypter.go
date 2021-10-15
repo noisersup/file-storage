@@ -31,41 +31,77 @@ func saveFile(infile multipart.File, outFile *os.File) error {
 	return nil
 }
 
-func encrypt(infile multipart.File, outFile *os.File, key []byte) error {
+func rmFile(path string) {
+	os.Remove(path)
+}
+
+func encrypt(r *multipart.Reader, dir string, key []byte) error {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 
 	iv := make([]byte, block.BlockSize())
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	buf := make([]byte, 1024)
+	buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	stream := cipher.NewCTR(block, iv)
+	log.Print(buf.Len())
 
 	iterationCount := 1000
 
-	for {
-		n, err := infile.Read(buf)
-		if n > 0 {
-			iterationCount++
-			if iterationCount >= 1000 {
-				fmt.Print(".")
-				iterationCount = 0
-			}
-			stream.XORKeyStream(buf, buf[:n])
-			outFile.Write(buf[:n])
-		}
+	part, err := r.NextPart()
+	if err != nil {
+		log.Print(err)
+	}
+	partRead := true
 
+	newFilepath := "./files/" + dir
+
+	//Create directory if not exists
+	log.Print("Make dir")
+	os.MkdirAll(newFilepath, os.ModePerm)
+
+	//newFilepath += "/" + handler.Filename + ".bin"
+	newFilepath += "/" + part.FileName() + ".bin"
+	log.Print(newFilepath)
+
+	rmFile(newFilepath)
+
+	log.Print("Open File")
+	outFile, err := os.OpenFile(newFilepath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	defer outFile.Close()
+	partRead = true
+
+	for {
+		if !partRead {
+			part, err = r.NextPart()
+		}
+		partRead = false
+		log.Print(1)
 		if err == io.EOF {
 			break
 		}
 
 		if err != nil {
-			return fmt.Errorf("Read %d bytes: %v", n, err)
+			rmFile(newFilepath)
+			return fmt.Errorf("Read %d bytes: %v", buf.Len(), err)
 		}
+		iterationCount++
+		if iterationCount >= 1000 {
+			fmt.Print(".")
+			iterationCount = 0
+		}
+		io.Copy(buf, part)
+		stream.XORKeyStream(buf.Bytes(), buf.Bytes()[:buf.Len()])
+		log.Print(buf.Len())
+		outFile.Write(buf.Bytes()[:buf.Len()])
 	}
 	log.Print("outfile write")
 	outFile.Write(iv)

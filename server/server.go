@@ -46,45 +46,18 @@ func InitServer() {
 }
 func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
 	log.Print("uploadFile")
-	r.ParseMultipartForm(s.maxUpload)
-
-	log.Print("FormFile")
-	file, handler, err := r.FormFile("file")
+	//r.ParseMultipartForm(s.maxUpload)
+	reader, err := r.MultipartReader()
 	if err != nil {
 		log.Print(err)
 		return
 	}
-
-	defer file.Close()
-
-	log.Printf("File: %+v\nSize: %+v MIME header: %+v", handler.Filename, handler.Size, handler.Header)
-
-	newFilepath := "./files/" + args[0]
-
-	//Create directory if not exists
-	log.Print("Make dir")
-	os.MkdirAll(newFilepath, os.ModePerm)
-
-	newFilepath += "/" + handler.Filename + ".bin"
-
-	log.Print("Open File")
-	outfile, err := os.OpenFile(newFilepath, os.O_RDWR|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
-	defer outfile.Close()
 
 	log.Print("encrypt")
-	err = encrypt(file, outfile, []byte("2A462D4A614E645267556B5870327354"))
+	err = encrypt(reader, args[0], []byte("2A462D4A614E645267556B5870327354"))
 	//err = saveFile(file, outfile)
 	if err != nil {
-		log.Print(err)
-		err := os.Remove(newFilepath)
-		if err != nil {
-			log.Print(err)
-		}
+		log.Print("encrypt", err)
 		return
 	}
 }
