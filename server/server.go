@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"mime"
 	"net/http"
@@ -9,17 +10,19 @@ import (
 	"regexp"
 )
 
+// Server is a structure responsible for handling all http requests.
 type Server struct {
-	maxUpload int64
+	maxUpload int64 //TODO: implement maxuploads
 }
 
 func InitServer() {
 	s := Server{1024 << 20}
 
+	//Handle requests
 	handlers := []struct {
 		regex   *regexp.Regexp
 		methods []string
-		handle  func(w http.ResponseWriter, r *http.Request, paths []string)
+		handle  func(w http.ResponseWriter, r *http.Request, paths []string) // paths are regex matches (in this example they capture the storage server paths)
 	}{
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"GET"}, s.getFile},
@@ -41,29 +44,32 @@ func InitServer() {
 		http.NotFound(w, r)
 	}
 
-	log.Print("Waiting for connection...")
-	log.Fatal(http.ListenAndServe(":8000", http.HandlerFunc(hanFunc)))
+	port := 8000
+
+	log.Printf("Waiting for connection on port: :%d...", port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), http.HandlerFunc(hanFunc))) //TODO: add custom port
 }
+
+// Handler function for POST requests.
+// Encrypts multipart file and store it in provided by user location
 func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
-	log.Print("uploadFile")
-	//r.ParseMultipartForm(s.maxUpload)
 	reader, err := r.MultipartReader()
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	log.Print("encrypt")
 	err = encrypt(reader, args[0], []byte("2A462D4A614E645267556B5870327354"))
-	//err = saveFile(file, outfile)
 	if err != nil {
-		log.Print("encrypt", err)
+		log.Print(err)
 		return
 	}
 }
 
+// Handler function for GET requests.
+// Decrypts file and send it in chunks to user
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
-	filePath := "./files/" + paths[0] + ".bin"
+	filePath := fmt.Sprintf("./files/%s.bin", paths[0])
 
 	err, status := serveFile(w, filePath)
 	if err != nil {
@@ -80,8 +86,9 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 	}
 }
 
+// serveFile decrypts file on provided path and writes it's to ResponseWriter
+// Returns error and status code
 func serveFile(w http.ResponseWriter, path string) (error, int) {
-	log.Print("Open file")
 	f, err := os.OpenFile(path, os.O_RDWR, 0777)
 	defer f.Close()
 	if err != nil {
@@ -95,6 +102,7 @@ func serveFile(w http.ResponseWriter, path string) (error, int) {
 
 	name := fi.Name()[:len(fi.Name())-4]
 
+	// Dont show file on web if it's bigger than ~100MB
 	if fi.Size() > 100*1000000 {
 		w.Header().Set("Content-Disposition", "attachment; filename="+name)
 	} else {
@@ -104,12 +112,10 @@ func serveFile(w http.ResponseWriter, path string) (error, int) {
 	ctype := mime.TypeByExtension(filepath.Ext(name))
 	w.Header().Set("Content-Type", ctype)
 
-	log.Print("decrypt")
 	err = decrypt(f, w, []byte("2A462D4A614E645267556B5870327354"))
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
-	log.Print("decryption ended")
 	return nil, 200
 }
 
