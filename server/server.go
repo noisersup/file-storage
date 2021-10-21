@@ -10,6 +10,7 @@ import (
 	"regexp"
 
 	"github.com/noisersup/encryptedfs-api/logger"
+	"github.com/noisersup/encryptedfs-api/server/dirs"
 )
 
 // Server is a structure responsible for handling all http requests.
@@ -29,6 +30,7 @@ func InitServer(l *logger.Logger) {
 	}{
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"GET"}, s.getFile},
+		{regexp.MustCompile(`^/ls/(.*[^/])$`), []string{"GET"}, s.listDirectories},
 	}
 
 	hanFunc := func(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +57,11 @@ func InitServer(l *logger.Logger) {
 	if err != nil {
 		l.SFatal("InitServer", err.Error())
 	}
+}
+
+func (s *Server) listDirectories(w http.ResponseWriter, r *http.Request, args []string) {
+	t := dirs.DirTree{}
+	t.GetFile(args[0])
 }
 
 // Handler function for POST requests.
