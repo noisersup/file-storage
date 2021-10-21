@@ -6,3 +6,7 @@ CREATE TABLE "file_tree" (
 );
 
 CREATE UNIQUE INDEX fileDupliaction ON file_tree (encrypted_name, parent_id);
+
+CREATE TABLE "file_tree_config" (
+    "root" UUID NOT NULL
+);

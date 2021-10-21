@@ -35,8 +35,13 @@ func ConnectDB(uri, database string, root string) *Database {
 		log.Fatal(err)
 	}
 	// defer conn.Close(context.Background())
+	db := Database{conn: conn}
+	err = db.fetchRoot()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	return &Database{conn, uuid.MustParse(root)}
+	return &db
 }
 
 func (db *Database) Close() error {
@@ -74,6 +79,23 @@ func Test() {
 
 	})
 	log.Print(file)
+}
+
+func (db *Database) fetchRoot() error {
+	row := db.conn.QueryRow(context.Background(), "SELECT root FROM file_tree_config;")
+	var root uuid.UUID
+	err := row.Scan(&root)
+	if err != nil {
+		if err != pgx.ErrNoRows {
+			return err
+		}
+		return err
+		//TODO:setRoot
+	}
+	log.Print(root)
+
+	db.root = root
+	return nil
 }
 
 func (db *Database) NewFile(encryptedName string) error {
