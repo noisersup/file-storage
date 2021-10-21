@@ -4,3 +4,5 @@ CREATE TABLE "file_tree" (
   "parent_id" UUID,
   CONSTRAINT "primary" PRIMARY KEY (id ASC)
 );
+
+CREATE UNIQUE INDEX fileDupliaction ON file_tree (encrypted_name, parent_id);

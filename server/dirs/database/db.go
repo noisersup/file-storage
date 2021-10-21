@@ -76,9 +76,9 @@ func Test() {
 	log.Print(file)
 }
 
-func (db *Database) NewFile(encryptedName string, parent uuid.UUID) error {
+func (db *Database) NewFile(encryptedName string) error {
 	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		return newFile(context.Background(), tx, encryptedName, parent)
+		return newFile(context.Background(), tx, encryptedName, db.root)
 	})
 }
 
@@ -87,7 +87,9 @@ func (db *Database) GetFile(pathNames []string) (*File, error) {
 }
 
 func newFile(ctx context.Context, tx pgx.Tx, encryptedName string, parent uuid.UUID) error {
-	if _, err := tx.Exec(ctx, "INSERT INTO file_tree (encrypted_name, parent_id) VALUES ($1, $2);", encryptedName, parent); err != nil {
+	//sqlFormula := "INSERT INTO file_tree (encrypted_name, parent_id) VALUES ($1, $2);"
+	sqlFormula := "INSERT INTO file_tree (encrypted_name, parent_id) VALUES ($1, $2);"
+	if _, err := tx.Exec(ctx, sqlFormula, encryptedName, parent); err != nil {
 		return err
 	}
 	return nil

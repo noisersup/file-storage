@@ -17,6 +17,7 @@ func main() {
 	defer db.Close()
 
 	f, err := db.GetFile([]string{"dev", "disk", "by-id"})
+	//err := db.NewFile("dev")
 	if err != nil {
 		log.Fatal(err)
 	}
