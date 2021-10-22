@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgx"
 	"github.com/google/uuid"
@@ -92,15 +93,73 @@ func (db *Database) fetchRoot() error {
 		return err
 		//TODO:setRoot
 	}
-	log.Print(root)
 
 	db.root = root
 	return nil
 }
 
-func (db *Database) NewFile(encryptedName string) error {
+/*
+/path/to/new/file
+
+get(path,root)
+get(to,path.hash)
+get(new,to.hash)
+
+^^^^ if !exists then create
+
+get(file,new.hash) if exists then error
+
+create(file,new.hash)
+*/
+
+/*
+/path/to/new/file
+
+get([path,to,new])
+if !exists then
+	get([path,to])
+	create(new,parent=to)
+	if !exists then get(path)
+		get([path])
+		create(path,parent=db.root)
+
+create(file,parent=new)
+
+*/
+
+func (db *Database) NewFile(pathNames []string) error {
+	parentId := db.root
+
+	err := func() error {
+		if len(pathNames) > 1 {
+			f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
+			if err != nil {
+				if err == fileNotFound {
+					err = db.NewFile(pathNames[:len(pathNames)-1])
+					if err != nil {
+						if err != fileExists {
+							return err
+						}
+					}
+					f, err = getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
+					if err != nil {
+						return err
+					}
+					parentId = f.id
+				}
+				return err
+			}
+
+			parentId = f.id
+		}
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
+
 	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		return newFile(context.Background(), tx, encryptedName, db.root)
+		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], parentId)
 	})
 }
 
@@ -109,13 +168,18 @@ func (db *Database) GetFile(pathNames []string) (*File, error) {
 }
 
 func newFile(ctx context.Context, tx pgx.Tx, encryptedName string, parent uuid.UUID) error {
-	//sqlFormula := "INSERT INTO file_tree (encrypted_name, parent_id) VALUES ($1, $2);"
 	sqlFormula := "INSERT INTO file_tree (encrypted_name, parent_id) VALUES ($1, $2);"
 	if _, err := tx.Exec(ctx, sqlFormula, encryptedName, parent); err != nil {
+		if strings.Contains(err.Error(), "duplicate key value") {
+			return fileExists
+		}
 		return err
 	}
 	return nil
 }
+
+var fileNotFound error = errors.New("File not found")
+var fileExists error = errors.New("File exists")
 
 func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error) {
 	if len(pathNames) == 0 {
@@ -139,7 +203,7 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 		fileFound = true
 	}
 	if !fileFound {
-		return nil, errors.New("File " + pathNames[0] + " not found")
+		return nil, fileNotFound
 	}
 
 	rows.Close()

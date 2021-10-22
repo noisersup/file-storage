@@ -16,10 +16,9 @@ func main() {
 	db := database.ConnectDB("postgresql://root@localhost:26257?sslmode=disable", "filestorage", "ef4ebb18-b915-49fe-ba90-443aba9762d2")
 	defer db.Close()
 
-	f, err := db.GetFile([]string{"dev", "disks", "by-id"})
-	//err := db.NewFile("dev")
+	//f, err := db.GetFile([]string{"dev", "disks", "by-id"})
+	err := db.NewFile([]string{"ledu", "michu", "leduchosky"})
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Print(f)
 }
