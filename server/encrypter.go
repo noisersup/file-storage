@@ -58,7 +58,7 @@ func decryptBytes(input, key []byte) ([]byte, error) {
 
 func getHashOfFile(fileName, key []byte) string {
 	hash := sha256.Sum256(append(fileName, key...))
-	return fmt.Sprintf("\r%x", hash)
+	return fmt.Sprintf("%x", hash)
 }
 
 func pathToArr(path string) []string {

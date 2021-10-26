@@ -131,7 +131,7 @@ create(file,parent=new)
 */
 func getHashOfFile(fileName, key []byte) string {
 	hash := sha256.Sum256(append(fileName, key...))
-	return fmt.Sprintf("\r%x", hash)
+	return fmt.Sprintf("%x", hash)
 }
 
 func (db *Database) NewFile(pathNames []string, key []byte) error {
