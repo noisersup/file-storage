@@ -5,14 +5,17 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
 	"os"
+	"regexp"
 
 	"github.com/noisersup/encryptedfs-api/logger"
+	"github.com/noisersup/encryptedfs-api/server/dirs/database"
 )
 
 func encryptBytes(input, key []byte) ([]byte, error) {
@@ -53,8 +56,17 @@ func decryptBytes(input, key []byte) ([]byte, error) {
 	return input, nil
 }
 
+func getHashOfFile(fileName, key []byte) string {
+	hash := sha256.Sum256(append(fileName, key...))
+	return fmt.Sprintf("\r%x", hash)
+}
+
+func pathToArr(path string) []string {
+	return regexp.MustCompile("([^/]*)").FindAllString(path, -1)
+}
+
 // Encrypts a file from multipart reader and stores it in provided directory
-func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
+func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.Database) error {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err
@@ -75,19 +87,26 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
 	}
 	partRead := true
 
-	newFilepath := "./files/" + dir
+	//newFilepath := "./files/" + dir
+
+	hash := getHashOfFile([]byte(part.FileName()), key)
+
+	err = db.NewFile(append(pathToArr(dir), part.FileName()), key)
+	if err != nil {
+		return err
+	}
 
 	//Create directory if not exists
-	os.MkdirAll(newFilepath, os.ModePerm)
+	//os.MkdirAll(newFilepath, os.ModePerm)
 
 	//newFilepath += "/" + handler.Filename + ".bin"
-	newFilepath += "/" + part.FileName() + ".bin"
-	log.Print(newFilepath)
+	//newFilepath += "/" + part.FileName() + ".bin"
+	//log.Print(newFilepath)
 
 	//overrides old file if exists
-	rmFile(newFilepath)
+	//rmFile(newFilepath)
 
-	outFile, err := os.OpenFile(newFilepath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	outFile, err := os.OpenFile("./files/"+hash, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -110,7 +129,7 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
 		}
 
 		if err != nil {
-			rmFile(newFilepath)
+			//rmFile(newFilepath)
 			return fmt.Errorf("Read %d bytes: %v", len(buf), err)
 		}
 

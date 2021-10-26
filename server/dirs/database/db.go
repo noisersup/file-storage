@@ -2,7 +2,9 @@ package database
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -126,8 +128,12 @@ if !exists then
 create(file,parent=new)
 
 */
+func getHashOfFile(fileName, key []byte) string {
+	hash := sha256.Sum256(append(fileName, key...))
+	return fmt.Sprintf("\r%x", hash)
+}
 
-func (db *Database) NewFile(pathNames []string) error {
+func (db *Database) NewFile(pathNames []string, key []byte) error {
 	parentId := db.root
 
 	err := func() error {
@@ -135,7 +141,7 @@ func (db *Database) NewFile(pathNames []string) error {
 			f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
 			if err != nil {
 				if err == fileNotFound {
-					err = db.NewFile(pathNames[:len(pathNames)-1])
+					err = db.NewFile(pathNames[:len(pathNames)-1], key)
 					if err != nil {
 						if err != fileExists {
 							return err
@@ -159,7 +165,7 @@ func (db *Database) NewFile(pathNames []string) error {
 	}
 
 	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], parentId)
+		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], getHashOfFile([]byte(pathNames[len(pathNames)-1]), key), parentId)
 	})
 }
 
@@ -167,9 +173,11 @@ func (db *Database) GetFile(pathNames []string) (*File, error) {
 	return getFile(db.conn, pathNames, db.root)
 }
 
-func newFile(ctx context.Context, tx pgx.Tx, encryptedName string, parent uuid.UUID) error {
-	sqlFormula := "INSERT INTO file_tree (encrypted_name, parent_id) VALUES ($1, $2);"
-	if _, err := tx.Exec(ctx, sqlFormula, encryptedName, parent); err != nil {
+func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID) error {
+	log.Print(name, hash)
+	sqlFormula := "INSERT INTO file_tree (encrypted_name,hash, parent_id) VALUES ($1, $2, $3);"
+	log.Print(hash)
+	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent); err != nil {
 		if strings.Contains(err.Error(), "duplicate key value") {
 			return fileExists
 		}
