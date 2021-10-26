@@ -5,14 +5,17 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
 	"os"
+	"regexp"
 
 	"github.com/noisersup/encryptedfs-api/logger"
+	"github.com/noisersup/encryptedfs-api/server/dirs/database"
 )
 
 func encryptBytes(input, key []byte) ([]byte, error) {
@@ -53,8 +56,25 @@ func decryptBytes(input, key []byte) ([]byte, error) {
 	return input, nil
 }
 
+func encryptPath(path string, key []byte) ([][]byte, error) {
+	matches := regexp.MustCompile("([^/]*)").FindAllString(path, -1)
+	out := make([][]byte, len(matches))
+
+	for _, plainFile := range matches {
+		cipher, err := encryptBytes([]byte(plainFile), key)
+		if err != nil {
+			return nil, err
+		}
+		b64 := base64.StdEncoding.EncodeToString(cipher)
+
+		out = append(out, []byte(b64))
+	}
+
+	return out, nil
+}
+
 // Encrypts a file from multipart reader and stores it in provided directory
-func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
+func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.Database) error {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err
@@ -65,7 +85,6 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
 		return err
 	}
 
-	//buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	buf := make([]byte, 1024)
 	stream := cipher.NewCTR(block, iv)
 
@@ -75,17 +94,23 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte) error {
 	}
 	partRead := true
 
-	newFilepath := "./files/" + dir
+	filenameCipher, err := encryptBytes([]byte(part.FileName()), key)
+	filenameB64 := base64.StdEncoding.EncodeToString(filenameCipher)
+	newFilepath := "./files/" + filenameB64
+
+	p, err := encryptPath(dir, key)
+	err = db.NewFile(append(p, []byte(filenameB64)))
+	if err != nil {
+		return err
+	}
 
 	//Create directory if not exists
-	os.MkdirAll(newFilepath, os.ModePerm)
+	//os.MkdirAll(newFilepath, os.ModePerm)
 
-	//newFilepath += "/" + handler.Filename + ".bin"
-	newFilepath += "/" + part.FileName() + ".bin"
 	log.Print(newFilepath)
 
 	//overrides old file if exists
-	rmFile(newFilepath)
+	//rmFile(newFilepath)
 
 	outFile, err := os.OpenFile(newFilepath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {

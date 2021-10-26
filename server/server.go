@@ -11,16 +11,18 @@ import (
 
 	"github.com/noisersup/encryptedfs-api/logger"
 	"github.com/noisersup/encryptedfs-api/server/dirs"
+	"github.com/noisersup/encryptedfs-api/server/dirs/database"
 )
 
 // Server is a structure responsible for handling all http requests.
 type Server struct {
 	maxUpload int64 //TODO: implement maxuploads
 	l         *logger.Logger
+	db        *database.Database
 }
 
-func InitServer(l *logger.Logger) {
-	s := Server{1024 << 20, l}
+func InitServer(l *logger.Logger, db *database.Database) {
+	s := Server{1024 << 20, l, db}
 
 	//Handle requests
 	handlers := []struct {
@@ -74,7 +76,7 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 		return
 	}
 
-	err = encryptMultipart(reader, args[0], []byte("2A462D4A614E645267556B5870327354"))
+	err = encryptMultipart(reader, args[0], []byte("2A462D4A614E645267556B5870327354"), s.db)
 	if err != nil {
 		log.Print(err)
 		return

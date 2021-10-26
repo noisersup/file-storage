@@ -71,7 +71,7 @@ func Test() {
 	var file File
 
 	err = crdbpgx.ExecuteTx(context.Background(), conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		f, err := getFile(conn, []string{"dev", "disks", "by-id"}, root)
+		f, err := getFile(conn, [][]byte{[]byte("dev"), []byte("disks"), []byte("by-id")}, root)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -127,11 +127,17 @@ create(file,parent=new)
 
 */
 
-func (db *Database) NewFile(pathNames []string) error {
+func (db *Database) NewFile(pathNames [][]byte) error {
+	log.Print("NewFile", pathNames)
+	for _, b := range pathNames {
+		log.Print(string(b))
+	}
 	parentId := db.root
 
 	err := func() error {
 		if len(pathNames) > 1 {
+
+			log.Print("getFile", pathNames[:len(pathNames)-1])
 			f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
 			if err != nil {
 				if err == fileNotFound {
@@ -141,6 +147,7 @@ func (db *Database) NewFile(pathNames []string) error {
 							return err
 						}
 					}
+					log.Print("get2", pathNames[:len(pathNames)-1])
 					f, err = getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
 					if err != nil {
 						return err
@@ -163,11 +170,11 @@ func (db *Database) NewFile(pathNames []string) error {
 	})
 }
 
-func (db *Database) GetFile(pathNames []string) (*File, error) {
+func (db *Database) GetFile(pathNames [][]byte) (*File, error) {
 	return getFile(db.conn, pathNames, db.root)
 }
 
-func newFile(ctx context.Context, tx pgx.Tx, encryptedName string, parent uuid.UUID) error {
+func newFile(ctx context.Context, tx pgx.Tx, encryptedName []byte, parent uuid.UUID) error {
 	sqlFormula := "INSERT INTO file_tree (encrypted_name, parent_id) VALUES ($1, $2);"
 	if _, err := tx.Exec(ctx, sqlFormula, encryptedName, parent); err != nil {
 		if strings.Contains(err.Error(), "duplicate key value") {
@@ -181,7 +188,7 @@ func newFile(ctx context.Context, tx pgx.Tx, encryptedName string, parent uuid.U
 var fileNotFound error = errors.New("File not found")
 var fileExists error = errors.New("File exists")
 
-func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error) {
+func getFile(conn *pgx.Conn, pathNames [][]byte, parent uuid.UUID) (*File, error) {
 	if len(pathNames) == 0 {
 		return nil, errors.New("pathNames empty")
 	}
