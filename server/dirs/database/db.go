@@ -175,6 +175,9 @@ func (db *Database) GetFile(pathNames []string) (*File, error) {
 }
 
 func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID) error {
+	if len(name) > 255 {
+		return errors.New("Filename too big")
+	}
 	log.Print(name, hash)
 	sqlFormula := "INSERT INTO file_tree (encrypted_name,hash, parent_id) VALUES ($1, $2, $3);"
 	log.Print(hash)
