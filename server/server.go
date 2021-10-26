@@ -88,9 +88,15 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 // Decrypts file and send it in chunks to user
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
 	s.l.Log("Fetching file...")
-	filePath := fmt.Sprintf("./files/%s.bin", paths[0])
 
-	err, status := serveFile(w, filePath)
+	f, err := s.db.GetFile(pathToArr(paths[0]))
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	filePath := fmt.Sprintf("./files/%s", f.Hash)
+
+	err, status := serveFile(w, filePath, f.Name)
 	if err != nil {
 		switch status {
 		case http.StatusNotFound:
@@ -111,7 +117,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 
 // serveFile decrypts file on provided path and writes it's to ResponseWriter
 // Returns error and status code
-func serveFile(w http.ResponseWriter, path string) (error, int) {
+func serveFile(w http.ResponseWriter, path, name string) (error, int) {
 	f, err := os.OpenFile(path, os.O_RDWR, 0777)
 	defer f.Close()
 	if err != nil {
@@ -123,7 +129,7 @@ func serveFile(w http.ResponseWriter, path string) (error, int) {
 		return err, http.StatusInternalServerError
 	}
 
-	name := fi.Name()[:len(fi.Name())-4]
+	//name := fi.Name()[:len(fi.Name())-4]
 
 	// Dont show file on web if it's bigger than ~100MB
 	if fi.Size() > 100*1000000 {

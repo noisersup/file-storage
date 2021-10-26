@@ -20,9 +20,10 @@ type Database struct {
 }
 
 type File struct {
-	id            uuid.UUID
-	encryptedName string
-	parentId      uuid.UUID
+	id       uuid.UUID
+	Name     string
+	Hash     string
+	parentId uuid.UUID
 }
 
 func ConnectDB(uri, database string, root string) *Database {
@@ -197,7 +198,7 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 	f := File{}
 
 	//handle null uuid
-	rows, err := conn.Query(context.Background(), "SELECT id, encrypted_name, parent_id FROM file_tree WHERE encrypted_name = $1 AND parent_id = $2;", pathNames[0], parent)
+	rows, err := conn.Query(context.Background(), "SELECT id, encrypted_name, hash, parent_id FROM file_tree WHERE encrypted_name = $1 AND parent_id = $2;", pathNames[0], parent)
 	if err != nil {
 		return nil, err
 	}
@@ -205,11 +206,12 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 	fileFound := false
 
 	for rows.Next() {
-		if err := rows.Scan(&f.id, &f.encryptedName, &f.parentId); err != nil {
+		if err := rows.Scan(&f.id, &f.Name, &f.Hash, &f.parentId); err != nil {
 			return nil, err
 		}
 		fileFound = true
 	}
+
 	if !fileFound {
 		return nil, fileNotFound
 	}
