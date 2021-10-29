@@ -175,6 +175,33 @@ func (db *Database) GetFile(pathNames []string) (*File, error) {
 	return getFile(db.conn, pathNames, db.root)
 }
 
+func (db *Database) DeleteFile(pathNames []string) error {
+	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		return deleteFile(db.conn, context.Background(), tx, pathNames, db.root)
+	})
+}
+
+func deleteFile(conn *pgx.Conn, ctx context.Context, tx pgx.Tx, pathNames []string, root uuid.UUID) error {
+	f, err := getFile(conn, pathNames, root)
+	if err != nil {
+		return err
+	}
+
+	if _, err = tx.Exec(ctx, "DELETE FROM file_tree WHERE id = $1;", f.id); err != nil {
+		return err
+	}
+
+	var filePath string
+
+	if f.Duplicate == 0 {
+		filePath = fmt.Sprintf("./files/%s", f.Hash)
+	} else {
+		filePath = fmt.Sprintf("./files/%s%d", f.Hash, f.Duplicate)
+	}
+
+	return os.Remove(filePath)
+}
+
 func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID, duplicate int) error {
 	if len(name) > 255 {
 		return errors.New("Filename too big")

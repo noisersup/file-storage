@@ -32,6 +32,8 @@ func InitServer(l *logger.Logger, db *database.Database) {
 	}{
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"GET"}, s.getFile},
+		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile},
+
 		{regexp.MustCompile(`^/ls/(.*[^/])$`), []string{"GET"}, s.listDirectories},
 	}
 
@@ -82,6 +84,16 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 		return
 	}
 	s.l.Log("File uploaded!")
+}
+
+func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []string) {
+	s.l.Log("Deleting file...")
+
+	err := s.db.DeleteFile(pathToArr(paths[0]))
+	if err != nil {
+		log.Print(err)
+		return
+	}
 }
 
 // Handler function for GET requests.
