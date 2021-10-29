@@ -92,14 +92,14 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 	hash := getHashOfFile([]byte(part.FileName()), key)
 
 	path := "./files/" + hash
-	n := 1
+	n := 0
 
 	newPath := path
 
 	for {
 		if _, err := os.Stat(newPath); !errors.Is(err, os.ErrNotExist) {
-			newPath = fmt.Sprintf("%s%d", path, n)
 			n++
+			newPath = fmt.Sprintf("%s%d", path, n)
 		} else {
 			break
 		}
