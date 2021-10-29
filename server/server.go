@@ -94,7 +94,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 		log.Print(err)
 		return
 	}
-	filePath := fmt.Sprintf("./files/%s", f.Hash)
+	filePath := fmt.Sprintf("./files/%s%d", f.Hash, f.Duplicate)
 
 	err, status := serveFile(w, filePath, f.Name)
 	if err != nil {

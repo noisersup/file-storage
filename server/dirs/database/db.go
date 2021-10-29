@@ -20,10 +20,11 @@ type Database struct {
 }
 
 type File struct {
-	id       uuid.UUID
-	Name     string
-	Hash     string
-	parentId uuid.UUID
+	id        uuid.UUID
+	Name      string
+	Hash      string
+	parentId  uuid.UUID
+	Duplicate int
 }
 
 func ConnectDB(uri, database string, root string) *Database {
@@ -134,7 +135,7 @@ func getHashOfFile(fileName, key []byte) string {
 	return fmt.Sprintf("%x", hash)
 }
 
-func (db *Database) NewFile(pathNames []string, key []byte) error {
+func (db *Database) NewFile(pathNames []string, key []byte, duplicate int) error {
 	parentId := db.root
 
 	err := func() error {
@@ -142,7 +143,7 @@ func (db *Database) NewFile(pathNames []string, key []byte) error {
 			f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
 			if err != nil {
 				if err == fileNotFound {
-					err = db.NewFile(pathNames[:len(pathNames)-1], key)
+					err = db.NewFile(pathNames[:len(pathNames)-1], key, 0)
 					if err != nil {
 						if err != fileExists {
 							return err
@@ -166,7 +167,7 @@ func (db *Database) NewFile(pathNames []string, key []byte) error {
 	}
 
 	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], getHashOfFile([]byte(pathNames[len(pathNames)-1]), key), parentId)
+		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], getHashOfFile([]byte(pathNames[len(pathNames)-1]), key), parentId, duplicate)
 	})
 }
 
@@ -174,14 +175,14 @@ func (db *Database) GetFile(pathNames []string) (*File, error) {
 	return getFile(db.conn, pathNames, db.root)
 }
 
-func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID) error {
+func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID, duplicate int) error {
 	if len(name) > 255 {
 		return errors.New("Filename too big")
 	}
 	log.Print(name, hash)
-	sqlFormula := "INSERT INTO file_tree (encrypted_name,hash, parent_id) VALUES ($1, $2, $3);"
+	sqlFormula := "INSERT INTO file_tree (encrypted_name,hash, parent_id, duplicate) VALUES ($1, $2, $3, $4);"
 	log.Print(hash)
-	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent); err != nil {
+	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent, duplicate); err != nil {
 		if strings.Contains(err.Error(), "duplicate key value") {
 			return fileExists
 		}
@@ -201,7 +202,7 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 	f := File{}
 
 	//handle null uuid
-	rows, err := conn.Query(context.Background(), "SELECT id, encrypted_name, hash, parent_id FROM file_tree WHERE encrypted_name = $1 AND parent_id = $2;", pathNames[0], parent)
+	rows, err := conn.Query(context.Background(), "SELECT id, encrypted_name, hash, parent_id,duplicate FROM file_tree WHERE encrypted_name = $1 AND parent_id = $2;", pathNames[0], parent)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +210,7 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 	fileFound := false
 
 	for rows.Next() {
-		if err := rows.Scan(&f.id, &f.Name, &f.Hash, &f.parentId); err != nil {
+		if err := rows.Scan(&f.id, &f.Name, &f.Hash, &f.parentId, &f.Duplicate); err != nil {
 			return nil, err
 		}
 		fileFound = true

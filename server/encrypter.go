@@ -91,7 +91,21 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 
 	hash := getHashOfFile([]byte(part.FileName()), key)
 
-	err = db.NewFile(append(pathToArr(dir), part.FileName()), key)
+	path := "./files/" + hash
+	n := 1
+
+	newPath := path
+
+	for {
+		if _, err := os.Stat(newPath); !errors.Is(err, os.ErrNotExist) {
+			newPath = fmt.Sprintf("%s%d", path, n)
+			n++
+		} else {
+			break
+		}
+	}
+
+	err = db.NewFile(append(pathToArr(dir), part.FileName()), key, n)
 	if err != nil {
 		return err
 	}
@@ -106,7 +120,7 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 	//overrides old file if exists
 	//rmFile(newFilepath)
 
-	outFile, err := os.OpenFile("./files/"+hash, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	outFile, err := os.OpenFile(newPath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return err
 	}
