@@ -10,7 +10,6 @@ import (
 	"regexp"
 
 	"github.com/noisersup/encryptedfs-api/logger"
-	"github.com/noisersup/encryptedfs-api/server/dirs"
 	"github.com/noisersup/encryptedfs-api/server/dirs/database"
 )
 
@@ -33,8 +32,6 @@ func InitServer(l *logger.Logger, db *database.Database) {
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"GET"}, s.getFile},
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile},
-
-		{regexp.MustCompile(`^/ls/(.*[^/])$`), []string{"GET"}, s.listDirectories},
 	}
 
 	hanFunc := func(w http.ResponseWriter, r *http.Request) {
@@ -61,11 +58,6 @@ func InitServer(l *logger.Logger, db *database.Database) {
 	if err != nil {
 		l.SFatal("InitServer", err.Error())
 	}
-}
-
-func (s *Server) listDirectories(w http.ResponseWriter, r *http.Request, args []string) {
-	t := dirs.DirTree{}
-	t.GetFile(args[0])
 }
 
 // Handler function for POST requests.
@@ -101,9 +93,38 @@ func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []stri
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
 	s.l.Log("Fetching file...")
 
-	f, err := s.db.GetFile(pathToArr(paths[0]))
+	path := pathToArr(paths[0])
+
+	if len(path) == 0 {
+		files, err := s.db.ListDirectory()
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		str := ""
+		for _, f := range files {
+			str += f.Name
+		}
+		w.Write([]byte(str))
+		return
+	}
+
+	f, err := s.db.GetFile(path)
 	if err != nil {
 		log.Print(err)
+		return
+	}
+	if f.IsDirectory {
+		files, err := s.db.ListDirectory(f.Id)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		str := ""
+		for _, f := range files {
+			str += f.Name
+		}
+		w.Write([]byte(str))
 		return
 	}
 	var filePath string

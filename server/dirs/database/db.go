@@ -20,11 +20,12 @@ type Database struct {
 }
 
 type File struct {
-	id        uuid.UUID
-	Name      string
-	Hash      string
-	parentId  uuid.UUID
-	Duplicate int
+	Id          uuid.UUID
+	Name        string
+	Hash        string
+	parentId    uuid.UUID
+	Duplicate   int
+	IsDirectory bool
 }
 
 func ConnectDB(uri, database string, root string) *Database {
@@ -135,7 +136,7 @@ func getHashOfFile(fileName, key []byte) string {
 	return fmt.Sprintf("%x", hash)
 }
 
-func (db *Database) NewFile(pathNames []string, key []byte, duplicate int) error {
+func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDirectory bool) error {
 	parentId := db.root
 
 	err := func() error {
@@ -143,7 +144,7 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int) error
 			f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
 			if err != nil {
 				if err == fileNotFound {
-					err = db.NewFile(pathNames[:len(pathNames)-1], key, 0)
+					err = db.NewFile(pathNames[:len(pathNames)-1], key, 0, true)
 					if err != nil {
 						if err != fileExists {
 							return err
@@ -153,12 +154,12 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int) error
 					if err != nil {
 						return err
 					}
-					parentId = f.id
+					parentId = f.Id
 				}
 				return err
 			}
 
-			parentId = f.id
+			parentId = f.Id
 		}
 		return nil
 	}()
@@ -167,12 +168,47 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int) error
 	}
 
 	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], getHashOfFile([]byte(pathNames[len(pathNames)-1]), key), parentId, duplicate)
+		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], getHashOfFile([]byte(pathNames[len(pathNames)-1]), key), parentId, duplicate, isDirectory)
 	})
 }
 
 func (db *Database) GetFile(pathNames []string) (*File, error) {
 	return getFile(db.conn, pathNames, db.root)
+}
+
+func (db *Database) ListDirectory(id ...uuid.UUID) ([]File, error) {
+	var dirId uuid.UUID
+	if len(id) == 0 {
+		dirId = db.root
+	} else {
+		dirId = id[0]
+	}
+	return listDirectory(db.conn, dirId)
+}
+
+func listDirectory(conn *pgx.Conn, id uuid.UUID) ([]File, error) {
+	files := []File{}
+	rows, err := conn.Query(context.Background(), "SELECT id, encrypted_name, hash, parent_id,duplicate, is_directory FROM file_tree WHERE parent_id = $1 ;", id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		f := File{}
+		if err := rows.Scan(&f.Id, &f.Name, &f.Hash, &f.parentId, &f.Duplicate, &f.IsDirectory); err != nil {
+			return nil, err
+		}
+		files = append(files, f)
+	}
+
+	if len(files) == 0 {
+		return nil, fileNotFound
+	}
+
+	rows.Close()
+
+	return files, nil
 }
 
 func (db *Database) DeleteFile(pathNames []string) error {
@@ -187,7 +223,7 @@ func deleteFile(conn *pgx.Conn, ctx context.Context, tx pgx.Tx, pathNames []stri
 		return err
 	}
 
-	if _, err = tx.Exec(ctx, "DELETE FROM file_tree WHERE id = $1;", f.id); err != nil {
+	if _, err = tx.Exec(ctx, "DELETE FROM file_tree WHERE id = $1;", f.Id); err != nil {
 		return err
 	}
 
@@ -202,14 +238,14 @@ func deleteFile(conn *pgx.Conn, ctx context.Context, tx pgx.Tx, pathNames []stri
 	return os.Remove(filePath)
 }
 
-func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID, duplicate int) error {
+func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID, duplicate int, isDirectory bool) error {
 	if len(name) > 255 {
 		return errors.New("Filename too big")
 	}
 	log.Print(name, hash)
-	sqlFormula := "INSERT INTO file_tree (encrypted_name,hash, parent_id, duplicate) VALUES ($1, $2, $3, $4);"
+	sqlFormula := "INSERT INTO file_tree (encrypted_name,hash, parent_id, duplicate, is_directory) VALUES ($1, $2, $3, $4, $5);"
 	log.Print(hash)
-	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent, duplicate); err != nil {
+	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent, duplicate, isDirectory); err != nil {
 		if strings.Contains(err.Error(), "duplicate key value") {
 			return fileExists
 		}
@@ -229,7 +265,7 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 	f := File{}
 
 	//handle null uuid
-	rows, err := conn.Query(context.Background(), "SELECT id, encrypted_name, hash, parent_id,duplicate FROM file_tree WHERE encrypted_name = $1 AND parent_id = $2;", pathNames[0], parent)
+	rows, err := conn.Query(context.Background(), "SELECT id, encrypted_name, hash, parent_id,duplicate, is_directory FROM file_tree WHERE encrypted_name = $1 AND parent_id = $2;", pathNames[0], parent)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +273,7 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 	fileFound := false
 
 	for rows.Next() {
-		if err := rows.Scan(&f.id, &f.Name, &f.Hash, &f.parentId, &f.Duplicate); err != nil {
+		if err := rows.Scan(&f.Id, &f.Name, &f.Hash, &f.parentId, &f.Duplicate, &f.IsDirectory); err != nil {
 			return nil, err
 		}
 		fileFound = true
@@ -253,5 +289,5 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 		return &f, nil
 	}
 
-	return getFile(conn, pathNames[1:], f.id)
+	return getFile(conn, pathNames[1:], f.Id)
 }

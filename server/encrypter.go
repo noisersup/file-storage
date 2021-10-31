@@ -105,7 +105,7 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 		}
 	}
 
-	err = db.NewFile(append(pathToArr(dir), part.FileName()), key, n)
+	err = db.NewFile(append(pathToArr(dir), part.FileName()), key, n, false)
 	if err != nil {
 		return err
 	}
