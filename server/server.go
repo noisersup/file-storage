@@ -30,7 +30,7 @@ func InitServer(l *logger.Logger, db *database.Database) {
 		handle  func(w http.ResponseWriter, r *http.Request, paths []string) // paths are regex matches (in this example they capture the storage server paths)
 	}{
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
-		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"GET"}, s.getFile},
+		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"GET"}, s.getFile},
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile},
 	}
 
@@ -95,7 +95,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 
 	path := pathToArr(paths[0])
 
-	if len(path) == 0 {
+	if len(path) == 1 && path[0] == "" {
 		files, err := s.db.ListDirectory()
 		if err != nil {
 			log.Print(err)
