@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -20,7 +19,7 @@ type Server struct {
 	db        *database.Database
 }
 
-func InitServer(l *logger.Logger, db *database.Database) {
+func InitServer(l *logger.Logger, db *database.Database) error {
 	s := Server{1024 << 20, l, db}
 
 	//Handle requests
@@ -54,39 +53,12 @@ func InitServer(l *logger.Logger, db *database.Database) {
 	port := 8000 //TODO: add custom port
 
 	l.Log("Waiting for connection on port: :%d...", port)
-	err := http.ListenAndServe(fmt.Sprintf(":%d", port), http.HandlerFunc(hanFunc))
-	if err != nil {
-		l.SFatal("InitServer", err.Error())
-	}
+	return http.ListenAndServe(fmt.Sprintf(":%d", port), http.HandlerFunc(hanFunc))
 }
 
-// Handler function for POST requests.
-// Encrypts multipart file and store it in provided by user location
-func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
-	s.l.Log("Uploading file...")
-	reader, err := r.MultipartReader()
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
-	err = encryptMultipart(reader, args[0], []byte("2A462D4A614E645267556B5870327354"), s.db)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	s.l.Log("File uploaded!")
-}
-
-func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []string) {
-	s.l.Log("Deleting file...")
-
-	err := s.db.DeleteFile(pathToArr(paths[0]))
-	if err != nil {
-		log.Print(err)
-		return
-	}
-}
+//
+//
+//
 
 // Handler function for GET requests.
 // Decrypts file and send it in chunks to user
@@ -98,7 +70,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 	if len(path) == 1 && path[0] == "" {
 		files, err := s.db.ListDirectory()
 		if err != nil {
-			log.Print(err)
+			s.l.Err(err.Error())
 			return
 		}
 		str := ""
@@ -111,13 +83,13 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 
 	f, err := s.db.GetFile(path)
 	if err != nil {
-		log.Print(err)
+		s.l.Err(err.Error())
 		return
 	}
 	if f.IsDirectory {
 		files, err := s.db.ListDirectory(f.Id)
 		if err != nil {
-			log.Print(err)
+			s.l.Err(err.Error())
 			return
 		}
 		str := ""
@@ -153,6 +125,37 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 		}
 	}
 	s.l.Log("File transfer done!")
+}
+
+// Handler function for POST requests.
+// Encrypts multipart file and store it in provided by user location
+func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
+	s.l.Log("Uploading file...")
+	reader, err := r.MultipartReader()
+	if err != nil {
+		s.l.Err(err.Error())
+		return
+	}
+
+	err = encryptMultipart(reader, args[0], []byte("2A462D4A614E645267556B5870327354"), s.db)
+	if err != nil {
+		s.l.Err(err.Error())
+		return
+	}
+	s.l.Log("File uploaded!")
+}
+
+// Handler function for DELETE requests.
+// Finds file on provided by user location
+// and removes it
+func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []string) {
+	s.l.Log("Deleting file...")
+
+	err := s.db.DeleteFile(pathToArr(paths[0]))
+	if err != nil {
+		s.l.Err(err.Error())
+		return
+	}
 }
 
 // serveFile decrypts file on provided path and writes it's to ResponseWriter
@@ -198,9 +201,3 @@ func errResponse(w http.ResponseWriter, status int, msg string) {
 	w.Header().Del("Content-Type")
 	w.Write([]byte("error: " + msg))
 }
-
-// file tree
-
-//user auth
-
-// generating key

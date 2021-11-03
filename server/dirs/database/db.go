@@ -28,63 +28,34 @@ type File struct {
 	IsDirectory bool
 }
 
-func ConnectDB(uri, database string, root string) *Database {
+// Connects to databased with provided data
+// and returns database object
+func ConnectDB(uri, database string, root string) (*Database, error) {
 	config, err := pgx.ParseConfig(os.ExpandEnv(uri))
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	config.Database = database
 
 	conn, err := pgx.ConnectConfig(context.Background(), config)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	// defer conn.Close(context.Background())
+
 	db := Database{conn: conn}
+
 	err = db.fetchRoot()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return &db
+	return &db, nil
 }
 
+// Close database connection (conn.Close())
 func (db *Database) Close() error {
 	return db.conn.Close(context.Background())
-}
-
-func Test() {
-	config, err := pgx.ParseConfig(os.ExpandEnv("postgresql://root@localhost:26257?sslmode=disable"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	config.Database = "filestorage"
-
-	conn, err := pgx.ConnectConfig(context.Background(), config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close(context.Background())
-
-	root := uuid.MustParse("ef4ebb18-b915-49fe-ba90-443aba9762d2")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var file File
-
-	err = crdbpgx.ExecuteTx(context.Background(), conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		f, err := getFile(conn, []string{"dev", "disks", "by-id"}, root)
-		if err != nil {
-			log.Fatal(err)
-		}
-		file = *f
-		return nil
-
-	})
-	log.Print(file)
 }
 
 func (db *Database) fetchRoot() error {
