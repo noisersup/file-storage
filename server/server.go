@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -73,11 +75,11 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 			s.l.Err(err.Error())
 			return
 		}
-		str := ""
+		filenames := []string{}
 		for _, f := range files {
-			str += f.Name
+			filenames = append(filenames, f.Name)
 		}
-		w.Write([]byte(str))
+		writeResponse(w, ListFilesResponse{filenames, ""}, http.StatusOK)
 		return
 	}
 
@@ -92,11 +94,11 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 			s.l.Err(err.Error())
 			return
 		}
-		str := ""
+		filenames := []string{}
 		for _, f := range files {
-			str += f.Name
+			filenames = append(filenames, f.Name)
 		}
-		w.Write([]byte(str))
+		writeResponse(w, ListFilesResponse{filenames, ""}, http.StatusOK)
 		return
 	}
 	var filePath string
@@ -134,12 +136,17 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 	reader, err := r.MultipartReader()
 	if err != nil {
 		s.l.Err(err.Error())
+		errResponse(w, http.StatusInternalServerError, "Internal error")
 		return
 	}
 
 	err = encryptMultipart(reader, args[0], []byte("2A462D4A614E645267556B5870327354"), s.db)
 	if err != nil {
 		s.l.Err(err.Error())
+		if err == database.FileExists {
+			errResponse(w, http.StatusNotFound, "File not found")
+		}
+		errResponse(w, http.StatusInternalServerError, "Internal error")
 		return
 	}
 	s.l.Log("File uploaded!")
@@ -189,6 +196,15 @@ func serveFile(w http.ResponseWriter, path, name string) (error, int) {
 		return err, http.StatusInternalServerError
 	}
 	return nil, 200
+}
+
+func writeResponse(w http.ResponseWriter, response interface{}, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	err := json.NewEncoder(w).Encode(response)
+	if err != nil {
+		log.Printf("JSON encoding error: %s", err) //TODO: Log file
+	}
 }
 
 func serverError(w http.ResponseWriter) {

@@ -114,10 +114,10 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 		if len(pathNames) > 1 {
 			f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
 			if err != nil {
-				if err == fileNotFound {
+				if err == FileNotFound {
 					err = db.NewFile(pathNames[:len(pathNames)-1], key, 0, true)
 					if err != nil {
-						if err != fileExists {
+						if err != FileExists {
 							return err
 						}
 					}
@@ -174,7 +174,7 @@ func listDirectory(conn *pgx.Conn, id uuid.UUID) ([]File, error) {
 	}
 
 	if len(files) == 0 {
-		return nil, fileNotFound
+		return nil, FileNotFound
 	}
 
 	rows.Close()
@@ -218,15 +218,15 @@ func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uu
 	log.Print(hash)
 	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent, duplicate, isDirectory); err != nil {
 		if strings.Contains(err.Error(), "duplicate key value") {
-			return fileExists
+			return FileExists
 		}
 		return err
 	}
 	return nil
 }
 
-var fileNotFound error = errors.New("File not found")
-var fileExists error = errors.New("File exists")
+var FileNotFound error = errors.New("File not found")
+var FileExists error = errors.New("File exists")
 
 func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error) {
 	if len(pathNames) == 0 {
@@ -251,7 +251,7 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 	}
 
 	if !fileFound {
-		return nil, fileNotFound
+		return nil, FileNotFound
 	}
 
 	rows.Close()
