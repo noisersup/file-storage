@@ -75,11 +75,11 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 			s.l.Err(err.Error())
 			return
 		}
-		filenames := []string{}
+		outFiles := []ListedFile{}
 		for _, f := range files {
-			filenames = append(filenames, f.Name)
+			outFiles = append(outFiles, ListedFile{f.Name, f.IsDirectory})
 		}
-		writeResponse(w, ListFilesResponse{filenames, ""}, http.StatusOK)
+		writeResponse(w, ListFilesResponse{outFiles, ""}, http.StatusOK)
 		return
 	}
 
@@ -94,11 +94,11 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 			s.l.Err(err.Error())
 			return
 		}
-		filenames := []string{}
+		outFiles := []ListedFile{}
 		for _, f := range files {
-			filenames = append(filenames, f.Name)
+			outFiles = append(outFiles, ListedFile{f.Name, f.IsDirectory})
 		}
-		writeResponse(w, ListFilesResponse{filenames, ""}, http.StatusOK)
+		writeResponse(w, ListFilesResponse{outFiles, ""}, http.StatusOK)
 		return
 	}
 	var filePath string

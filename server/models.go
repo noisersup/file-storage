@@ -7,6 +7,11 @@ type ErrResponse struct {
 }
 
 type ListFilesResponse struct {
-	Files []string `json:"files"`
-	Error string   `json:"error"`
+	Files []ListedFile `json:"files"`
+	Error string       `json:"error"`
+}
+
+type ListedFile struct {
+	Name        string `json:"name"`
+	IsDirectory bool   `json:"bool"`
 }
