@@ -13,5 +13,5 @@ type ListFilesResponse struct {
 
 type ListedFile struct {
 	Name        string `json:"name"`
-	IsDirectory bool   `json:"bool"`
+	IsDirectory bool   `json:"isDirectory"`
 }

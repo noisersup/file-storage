@@ -1,21 +1,31 @@
 package main
 
 import (
-	"log"
+	"flag"
 
-	"github.com/noisersup/encryptedfs-api/logger"
+	l "github.com/noisersup/encryptedfs-api/logger"
 	"github.com/noisersup/encryptedfs-api/server"
 	"github.com/noisersup/encryptedfs-api/server/dirs/database"
 )
 
 func main() {
-	l := logger.Logger{}
+	v := flag.Bool("v", false, "verbose output")
+	flag.Parse()
 
-	db, err := database.ConnectDB("postgresql://root@localhost:26257?sslmode=disable", "filestorage", "ef4ebb18-b915-49fe-ba90-443aba9762d2")
+	l.Verbose = *v
+
+	dbPayload := "postgresql://root@localhost:26257?sslmode=disable"
+	dbName := "filestorage"
+
+	l.LogV("Connecting to database %s with payload: %s", dbName, dbPayload)
+
+	db, err := database.ConnectDB(dbPayload, dbName, "ef4ebb18-b915-49fe-ba90-443aba9762d2")
 	if err != nil {
-		log.Fatal(err)
+		l.Fatal(err.Error())
 	}
 	defer db.Close()
 
-	server.InitServer(&l, db)
+	if err = server.InitServer(db); err != nil {
+		l.Fatal(err.Error())
+	}
 }

@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 
+	l "github.com/noisersup/encryptedfs-api/logger"
+
 	"github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgx"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
@@ -55,6 +57,7 @@ func ConnectDB(uri, database string, root string) (*Database, error) {
 
 // Close database connection (conn.Close())
 func (db *Database) Close() error {
+	l.Log("Closing database...")
 	return db.conn.Close(context.Background())
 }
 
@@ -71,37 +74,10 @@ func (db *Database) fetchRoot() error {
 	}
 
 	db.root = root
+	l.LogV("root: %s", db.root.String())
 	return nil
 }
 
-/*
-/path/to/new/file
-
-get(path,root)
-get(to,path.hash)
-get(new,to.hash)
-
-^^^^ if !exists then create
-
-get(file,new.hash) if exists then error
-
-create(file,new.hash)
-*/
-
-/*
-/path/to/new/file
-
-get([path,to,new])
-if !exists then
-	get([path,to])
-	create(new,parent=to)
-	if !exists then get(path)
-		get([path])
-		create(path,parent=db.root)
-
-create(file,parent=new)
-
-*/
 func getHashOfFile(fileName, key []byte) string {
 	hash := sha256.Sum256(append(fileName, key...))
 	return fmt.Sprintf("%x", hash)

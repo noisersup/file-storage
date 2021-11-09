@@ -15,6 +15,7 @@ import (
 	"regexp"
 
 	"github.com/noisersup/encryptedfs-api/logger"
+	l "github.com/noisersup/encryptedfs-api/logger"
 	"github.com/noisersup/encryptedfs-api/server/dirs/database"
 )
 
@@ -83,7 +84,7 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 
 	part, err := r.NextPart()
 	if err != nil {
-		log.Print(err)
+		return err
 	}
 	partRead := true
 
@@ -110,32 +111,19 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 		return err
 	}
 
-	//Create directory if not exists
-	//os.MkdirAll(newFilepath, os.ModePerm)
-
-	//newFilepath += "/" + handler.Filename + ".bin"
-	//newFilepath += "/" + part.FileName() + ".bin"
-	//log.Print(newFilepath)
-
-	//overrides old file if exists
-	//rmFile(newFilepath)
-
 	outFile, err := os.OpenFile(newPath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return err
 	}
-	l := logger.Logger{}
 
 	defer outFile.Close()
 	partRead = true // part of file was read once (for metadata purposes)
 
 	for {
-		log.Print("\n")
-		log.Print(err)
 		if !partRead {
-			l.Log("NextPart")
+			l.LogV("NextPart")
 			part, err = r.NextPart()
-			l.Log("Part found")
+			l.LogV("Part found")
 		}
 		partRead = false
 		if err == io.EOF {
@@ -147,9 +135,10 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 			return fmt.Errorf("Read %d bytes: %v", len(buf), err)
 		}
 
-		l.Log("io.Copy")
 		for {
-			fmt.Print(".")
+			if l.Verbose {
+				log.Print(".")
+			}
 			n, err := part.Read(buf)
 			if n > 0 {
 				stream.XORKeyStream(buf, buf[:n])
@@ -163,9 +152,9 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 			}
 		}
 	}
-	l.Log("outFile.Write(iv)")
+	l.LogV("outFile.Write(iv)")
 	outFile.Write(iv)
-	l.Log("written iv")
+	l.LogV("written iv")
 
 	return nil
 }
@@ -198,7 +187,9 @@ func decrypt(file *os.File, part io.Writer, key []byte) error {
 	for {
 		n, err := file.Read(buf)
 		if n > 0 {
-			d.PrintDots()
+			if logger.Verbose {
+				d.PrintDots()
+			}
 			// IV bytes don't belong the original message
 			if n > int(length) {
 				n = int(length)

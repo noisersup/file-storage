@@ -3,26 +3,24 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 
-	"github.com/noisersup/encryptedfs-api/logger"
+	l "github.com/noisersup/encryptedfs-api/logger"
 	"github.com/noisersup/encryptedfs-api/server/dirs/database"
 )
 
 // Server is a structure responsible for handling all http requests.
 type Server struct {
 	maxUpload int64 //TODO: implement maxuploads
-	l         *logger.Logger
 	db        *database.Database
 }
 
-func InitServer(l *logger.Logger, db *database.Database) error {
-	s := Server{1024 << 20, l, db}
+func InitServer(db *database.Database) error {
+	s := Server{1024 << 20, db}
 
 	//Handle requests
 	handlers := []struct {
@@ -36,6 +34,7 @@ func InitServer(l *logger.Logger, db *database.Database) error {
 	}
 
 	hanFunc := func(w http.ResponseWriter, r *http.Request) {
+		l.Log("%s %s", r.Method, r.URL.Path)
 		for _, handler := range handlers {
 			match := handler.regex.FindStringSubmatch(r.URL.Path)
 			if match == nil {
@@ -48,7 +47,7 @@ func InitServer(l *logger.Logger, db *database.Database) error {
 				}
 			}
 		}
-		l.SWarn("hanFunc", "Cannot handle request\n Request: %v", r)
+		l.Warn("Cannot handle request\n Request: %v", r)
 		http.NotFound(w, r)
 	}
 
@@ -65,14 +64,18 @@ func InitServer(l *logger.Logger, db *database.Database) error {
 // Handler function for GET requests.
 // Decrypts file and send it in chunks to user
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
-	s.l.Log("Fetching file...")
+	l.LogV("Fetching file...")
 
 	path := pathToArr(paths[0])
 
 	if len(path) == 1 && path[0] == "" {
+		l.LogV("Listing root directory")
 		files, err := s.db.ListDirectory()
 		if err != nil {
-			s.l.Err(err.Error())
+			if err == database.FileNotFound {
+				errResponse(w, http.StatusNotFound, err.Error())
+			}
+			l.Err(err.Error())
 			return
 		}
 		outFiles := []ListedFile{}
@@ -83,15 +86,18 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 		return
 	}
 
+	l.LogV("Getting file")
 	f, err := s.db.GetFile(path)
 	if err != nil {
-		s.l.Err(err.Error())
+		errResponse(w, http.StatusNotFound, "File not found")
+		l.Err(err.Error())
 		return
 	}
 	if f.IsDirectory {
+		l.LogV("Listing directory")
 		files, err := s.db.ListDirectory(f.Id)
 		if err != nil {
-			s.l.Err(err.Error())
+			l.Err(err.Error())
 			return
 		}
 		outFiles := []ListedFile{}
@@ -101,66 +107,66 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 		writeResponse(w, ListFilesResponse{outFiles, ""}, http.StatusOK)
 		return
 	}
+
 	var filePath string
 	if f.Duplicate == 0 {
-
 		filePath = fmt.Sprintf("./files/%s", f.Hash)
 	} else {
-
 		filePath = fmt.Sprintf("./files/%s%d", f.Hash, f.Duplicate)
 	}
 
+	l.LogV("Serving file")
 	err, status := serveFile(w, filePath, f.Name)
 	if err != nil {
 		switch status {
 		case http.StatusNotFound:
 			errResponse(w, status, "File not found")
-			s.l.Log("File %s not found [error: %s]", filePath, err.Error())
+			l.Err("File %s not found [error: %s]", filePath, err.Error())
 			break
 		case http.StatusInternalServerError:
 			serverError(w)
-			s.l.SErr("getFile", "Internal error: %s", err.Error())
+			l.Err("getFile Internal error: %s", err.Error())
 			break
 		default:
 			serverError(w)
-			s.l.SWarn("getFile", "Undefined error: %s", err.Error())
+			l.Warn("getFile Undefined error: %s", err.Error())
 		}
 	}
-	s.l.Log("File transfer done!")
+	l.LogV("File transfer done!")
 }
 
 // Handler function for POST requests.
 // Encrypts multipart file and store it in provided by user location
 func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
-	s.l.Log("Uploading file...")
+	l.LogV("Uploading file...")
 	reader, err := r.MultipartReader()
 	if err != nil {
-		s.l.Err(err.Error())
+		l.Err(err.Error())
 		errResponse(w, http.StatusInternalServerError, "Internal error")
 		return
 	}
 
 	err = encryptMultipart(reader, args[0], []byte("2A462D4A614E645267556B5870327354"), s.db)
 	if err != nil {
-		s.l.Err(err.Error())
+		l.Err(err.Error())
 		if err == database.FileExists {
 			errResponse(w, http.StatusNotFound, "File not found")
 		}
 		errResponse(w, http.StatusInternalServerError, "Internal error")
 		return
 	}
-	s.l.Log("File uploaded!")
+	l.LogV("File uploaded!")
 }
 
 // Handler function for DELETE requests.
 // Finds file on provided by user location
 // and removes it
 func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []string) {
-	s.l.Log("Deleting file...")
+	l.LogV("Deleting file...")
 
 	err := s.db.DeleteFile(pathToArr(paths[0]))
 	if err != nil {
-		s.l.Err(err.Error())
+		l.Err(err.Error())
 		return
 	}
 }
@@ -203,7 +209,7 @@ func writeResponse(w http.ResponseWriter, response interface{}, statusCode int) 
 	w.WriteHeader(statusCode)
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
-		log.Printf("JSON encoding error: %s", err) //TODO: Log file
+		l.Err("JSON encoding error: %s", err)
 	}
 }
 
@@ -215,5 +221,5 @@ func errResponse(w http.ResponseWriter, status int, msg string) {
 	w.WriteHeader(status)
 	w.Header().Del("Content-Disposition")
 	w.Header().Del("Content-Type")
-	w.Write([]byte("error: " + msg))
+	writeResponse(w, ErrResponse{msg}, status)
 }
