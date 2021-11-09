@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"mime/multipart"
 	"os"
 	"regexp"
@@ -137,7 +136,7 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 
 		for {
 			if l.Verbose {
-				log.Print(".")
+				fmt.Print(".")
 			}
 			n, err := part.Read(buf)
 			if n > 0 {
