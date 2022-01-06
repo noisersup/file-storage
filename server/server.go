@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 
+	"github.com/noisersup/encryptedfs-api/auth"
 	l "github.com/noisersup/encryptedfs-api/logger"
 	"github.com/noisersup/encryptedfs-api/server/dirs/database"
 )
@@ -17,20 +19,27 @@ import (
 type Server struct {
 	maxUpload int64 //TODO: implement maxuploads
 	db        *database.Database
+	auth      *auth.Auth
 }
 
 func InitServer(db *database.Database) error {
-	s := Server{1024 << 20, db}
+	a, err := auth.InitAuth()
+	if err != nil {
+		return err
+	}
+	s := Server{1024 << 20, db, a}
 
 	//Handle requests
 	handlers := []struct {
-		regex   *regexp.Regexp
-		methods []string
-		handle  func(w http.ResponseWriter, r *http.Request, paths []string) // paths are regex matches (in this example they capture the storage server paths)
+		regex      *regexp.Regexp
+		methods    []string
+		handle     func(w http.ResponseWriter, r *http.Request, paths []string, user string) // paths are regex matches (in this example they capture the storage server paths)
+		authNeeded bool
 	}{
-		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
-		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"GET"}, s.getFile},
-		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile},
+		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile, true}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
+		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"GET"}, s.getFile, true},
+		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile, true},
+		{regexp.MustCompile(`^/login$`), []string{"POST"}, s.signIn, false},
 	}
 
 	hanFunc := func(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +51,14 @@ func InitServer(db *database.Database) error {
 			}
 			for _, allowed := range handler.methods {
 				if r.Method == allowed {
-					handler.handle(w, r, match[1:])
+					var authResp string
+					if handler.authNeeded {
+						authResp = a.Authorize(w, r)
+						if authResp == "" {
+							return
+						}
+					}
+					handler.handle(w, r, match[1:], authResp)
 					return
 				}
 			}
@@ -63,7 +79,8 @@ func InitServer(db *database.Database) error {
 
 // Handler function for GET requests.
 // Decrypts file and send it in chunks to user
-func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string) {
+func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string, user string) {
+	l.Log(user)
 	l.LogV("Fetching file...")
 
 	path := pathToArr(paths[0])
@@ -137,7 +154,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string)
 
 // Handler function for POST requests.
 // Encrypts multipart file and store it in provided by user location
-func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string) {
+func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string, user string) {
 	l.LogV("Uploading file...")
 	reader, err := r.MultipartReader()
 	if err != nil {
@@ -161,7 +178,7 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 // Handler function for DELETE requests.
 // Finds file on provided by user location
 // and removes it
-func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []string) {
+func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []string, user string) {
 	l.LogV("Deleting file...")
 
 	err := s.db.DeleteFile(pathToArr(paths[0]))
@@ -171,14 +188,39 @@ func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []stri
 	}
 }
 
+type Credentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func (s *Server) signIn(w http.ResponseWriter, r *http.Request, _ []string, _ string) {
+	var credentials Credentials
+	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	sessionToken, status := s.auth.Signin(credentials.Username, credentials.Password)
+	if status != http.StatusOK {
+		w.WriteHeader(status)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    "session_token",
+		Value:   sessionToken,
+		Expires: time.Now().Add(120 * time.Second),
+	})
+}
+
 // serveFile decrypts file on provided path and writes it's to ResponseWriter
 // Returns error and status code
 func serveFile(w http.ResponseWriter, path, name string) (error, int) {
 	f, err := os.OpenFile(path, os.O_RDWR, 0777)
-	defer f.Close()
 	if err != nil {
 		return err, http.StatusNotFound
 	}
+	defer f.Close()
 
 	fi, err := f.Stat()
 	if err != nil {
