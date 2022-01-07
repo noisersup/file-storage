@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gomodule/redigo/redis"
 	uuid "github.com/satori/go.uuid"
@@ -74,4 +75,46 @@ func (a *Auth) Authorize(w http.ResponseWriter, r *http.Request) string {
 	}
 
 	return fmt.Sprintf("%s", response)
+}
+
+func (a *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session_token")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			w.WriteHeader(http.StatusUnauthorized)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		return
+	}
+
+	userToken := cookie.Value
+
+	response, err := a.cache.Do("GET", userToken)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if response == nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	newToken := uuid.NewV4().String()
+	_, err = a.cache.Do("SETEX", newToken, "120", fmt.Sprintf("%s", response))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	_, err = a.cache.Do("DEL", userToken)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    "session_token",
+		Value:   newToken,
+		Expires: time.Now().Add(120 * time.Second),
+	})
 }

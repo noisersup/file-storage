@@ -40,6 +40,7 @@ func InitServer(db *database.Database) error {
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"GET"}, s.getFile, true},
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile, true},
 		{regexp.MustCompile(`^/login$`), []string{"POST"}, s.signIn, false},
+		{regexp.MustCompile(`^/refresh$`), []string{"POST"}, s.refresh, false},
 	}
 
 	hanFunc := func(w http.ResponseWriter, r *http.Request) {
@@ -211,6 +212,10 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request, _ []string, _ st
 		Value:   sessionToken,
 		Expires: time.Now().Add(120 * time.Second),
 	})
+}
+
+func (s *Server) refresh(w http.ResponseWriter, r *http.Request, _ []string, _ string) {
+	s.auth.Refresh(w, r)
 }
 
 // serveFile decrypts file on provided path and writes it's to ResponseWriter
