@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -23,7 +24,7 @@ type Server struct {
 }
 
 func InitServer(db *database.Database) error {
-	a, err := auth.InitAuth()
+	a, err := auth.InitAuth(db)
 	if err != nil {
 		return err
 	}
@@ -39,7 +40,8 @@ func InitServer(db *database.Database) error {
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile, true}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"GET"}, s.getFile, true},
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile, true},
-		{regexp.MustCompile(`^/login$`), []string{"POST"}, s.signIn, false},
+		{regexp.MustCompile(`^/signin$`), []string{"POST"}, s.signIn, false},
+		{regexp.MustCompile(`^/signup$`), []string{"POST"}, s.signUp, false},
 		{regexp.MustCompile(`^/refresh$`), []string{"POST"}, s.refresh, false},
 	}
 
@@ -192,6 +194,17 @@ func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []stri
 type Credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+func (s *Server) signUp(w http.ResponseWriter, r *http.Request, _ []string, _ string) {
+	var credentials Credentials
+	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	status := s.auth.Signup(credentials.Username, credentials.Password)
+	log.Print(status)
+	w.WriteHeader(status)
 }
 
 func (s *Server) signIn(w http.ResponseWriter, r *http.Request, _ []string, _ string) {

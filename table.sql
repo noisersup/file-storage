@@ -11,3 +11,9 @@ CREATE UNIQUE INDEX fileDupliaction ON file_tree (encrypted_name, parent_id);
 CREATE TABLE "file_tree_config" (
     "root" UUID NOT NULL
 );
+
+CREATE TABLE "users" (
+	"username" STRING(16) NOT NULL,
+	"password" STRING(55),
+  	CONSTRAINT "primary" PRIMARY KEY (username)
+);

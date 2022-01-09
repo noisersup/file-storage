@@ -83,6 +83,30 @@ func getHashOfFile(fileName, key []byte) string {
 	return fmt.Sprintf("%x", hash)
 }
 
+func (db *Database) NewUser(username, hashedPassword string) error {
+	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		return db.newUser(context.Background(), tx, username, hashedPassword)
+	})
+}
+
+func (db *Database) newUser(ctx context.Context, tx pgx.Tx, username, hashedPassword string) error {
+	sqlFormula := "INSERT INTO users (username, password) VALUES ($1,$2);"
+
+	if _, err := tx.Exec(ctx, sqlFormula, username, hashedPassword); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *Database) GetPasswordOfUser(username string) (string, error) {
+	var expectedPassword string
+	err := db.conn.QueryRow(context.Background(), "SELECT password FROM users WHERE username=$1;", username).Scan(&expectedPassword)
+	if err != nil {
+		return "", err
+	}
+	return expectedPassword, err
+}
+
 func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDirectory bool) error {
 	parentId := db.root
 
