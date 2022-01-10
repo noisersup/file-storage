@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -102,6 +103,7 @@ func deleteFile(conn *pgx.Conn, ctx context.Context, tx pgx.Tx, pathNames []stri
 
 // Creates new file entry in database
 func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID, duplicate int, isDirectory bool) error {
+	log.Print("newFile: ", name)
 	if len(name) > 255 {
 		return errors.New("Filename too big")
 	}

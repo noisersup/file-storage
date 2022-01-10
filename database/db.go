@@ -83,7 +83,6 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 		return fmt.Errorf("NewFile: no path provided")
 	}
 	parentId := db.root
-
 	/*
 		Warning!!!
 		Be careful with using recursion in go (also in production environments...).
@@ -127,10 +126,8 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 	if err != nil {
 		return err
 	}
-
 	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
 		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], getHashOfFile([]byte(pathNames[len(pathNames)-1]), key), parentId, duplicate, isDirectory)
-
 	})
 }
 

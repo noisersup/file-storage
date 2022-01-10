@@ -135,8 +135,14 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string,
 		filePath = fmt.Sprintf("./files/%s%d", f.Hash, f.Duplicate)
 	}
 
+	key, err := s.db.GetKey(user)
+	if err != nil {
+		l.Err("%s", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
 	l.LogV("Serving file")
-	err, status := serveFile(w, filePath, f.Name)
+	err, status := serveFile(w, filePath, f.Name, key)
 	if err != nil {
 		switch status {
 		case http.StatusNotFound:
@@ -166,7 +172,13 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 		return
 	}
 
-	err = encryptMultipart(reader, args[0], []byte("2A462D4A614E645267556B5870327354"), s.db)
+	key, err := s.db.GetKey(user)
+	if err != nil {
+		l.Err("%s", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	err = encryptMultipart(reader, args[0], key, s.db)
 	if err != nil {
 		l.Err(err.Error())
 		if err == database.FileExists {
@@ -233,7 +245,7 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request, _ []string, _ s
 
 // serveFile decrypts file on provided path and writes it's to ResponseWriter
 // Returns error and status code
-func serveFile(w http.ResponseWriter, path, name string) (error, int) {
+func serveFile(w http.ResponseWriter, path, name string, key []byte) (error, int) {
 	f, err := os.OpenFile(path, os.O_RDWR, 0777)
 	if err != nil {
 		return err, http.StatusNotFound
@@ -257,7 +269,7 @@ func serveFile(w http.ResponseWriter, path, name string) (error, int) {
 	ctype := mime.TypeByExtension(filepath.Ext(name))
 	w.Header().Set("Content-Type", ctype)
 
-	err = decrypt(f, w, []byte("2A462D4A614E645267556B5870327354"))
+	err = decrypt(f, w, key)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}

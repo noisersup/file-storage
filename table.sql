@@ -14,6 +14,7 @@ CREATE TABLE "file_tree_config" (
 
 CREATE TABLE "users" (
 	"username" STRING(16) NOT NULL,
-	"password" STRING(60),
+	"password" STRING(60) NOT NULL,
+	"key"	   STRING(44) NOT NULL,
   	CONSTRAINT "primary" PRIMARY KEY (username)
 );
