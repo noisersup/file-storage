@@ -107,39 +107,60 @@ func (db *Database) GetPasswordOfUser(username string) (string, error) {
 	return expectedPassword, err
 }
 
+// Adds file entry to database
 func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDirectory bool) error {
+	if len(pathNames) == 0 {
+		return fmt.Errorf("NewFile: no path provided")
+	}
 	parentId := db.root
 
+	/*
+		Warning!!!
+		Be careful with using recursion in go (also in production environments...).
+		Go compiler doesn't implement tail call optimization so it is possible to overflow the stack.
+	*/
 	err := func() error {
-		if len(pathNames) > 1 {
-			f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
-			if err != nil {
-				if err == FileNotFound {
-					err = db.NewFile(pathNames[:len(pathNames)-1], key, 0, true)
-					if err != nil {
-						if err != FileExists {
-							return err
-						}
-					}
-					f, err = getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
-					if err != nil {
+		// If only one file in path return from recursion and add it to database
+		if len(pathNames) == 1 {
+			return nil
+		}
+
+		// check if parent of file exists
+		f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
+		if err != nil {
+			// if parent doesn't exist create it
+			if err == FileNotFound {
+				err = db.NewFile(pathNames[:len(pathNames)-1], key, 0, true)
+				if err != nil {
+					if err != FileExists {
 						return err
 					}
-					parentId = f.Id
 				}
-				return err
-			}
 
-			parentId = f.Id
+				// we're sure that the parent of file exists (i guess...)
+				// now we can get it's database id to link our file to it
+				f, err = getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
+				if err != nil {
+					return err
+				}
+				parentId = f.Id
+				return nil
+			}
+			return err
 		}
+
+		//if parent exists set variable parentId to it's id
+		parentId = f.Id
 		return nil
 	}()
+
 	if err != nil {
 		return err
 	}
 
 	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
 		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], getHashOfFile([]byte(pathNames[len(pathNames)-1]), key), parentId, duplicate, isDirectory)
+
 	})
 }
 
@@ -213,7 +234,7 @@ func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uu
 	if len(name) > 255 {
 		return errors.New("Filename too big")
 	}
-	log.Print(name, hash)
+	log.Print(name, " ", hash)
 	sqlFormula := "INSERT INTO file_tree (encrypted_name,hash, parent_id, duplicate, is_directory) VALUES ($1, $2, $3, $4, $5);"
 	log.Print(hash)
 	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent, duplicate, isDirectory); err != nil {
