@@ -86,7 +86,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string,
 	l.Log(user)
 	l.LogV("Fetching file...")
 
-	path := pathToArr(paths[0])
+	path := database.PathToArr(paths[0])
 
 	if len(path) == 1 && path[0] == "" {
 		l.LogV("Listing root directory")
@@ -184,7 +184,7 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []string, user string) {
 	l.LogV("Deleting file...")
 
-	err := s.db.DeleteFile(pathToArr(paths[0]))
+	err := s.db.DeleteFile(database.PathToArr(paths[0]))
 	if err != nil {
 		l.Err(err.Error())
 		return

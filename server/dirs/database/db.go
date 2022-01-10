@@ -164,6 +164,12 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 	})
 }
 
+/*
+	Gets file id placed on given path
+
+	pathNames array contains filenames of path from the first to last
+	ex: /a/b/c/d.conf == {"a","b","c","d.conf"}
+*/
 func (db *Database) GetFile(pathNames []string) (*File, error) {
 	return getFile(db.conn, pathNames, db.root)
 }

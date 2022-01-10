@@ -11,7 +11,6 @@ import (
 	"io"
 	"mime/multipart"
 	"os"
-	"regexp"
 
 	"github.com/noisersup/encryptedfs-api/logger"
 	l "github.com/noisersup/encryptedfs-api/logger"
@@ -61,10 +60,6 @@ func getHashOfFile(fileName, key []byte) string {
 	return fmt.Sprintf("%x", hash)
 }
 
-func pathToArr(path string) []string {
-	return regexp.MustCompile("([^/]*)").FindAllString(path, -1)
-}
-
 // Encrypts a file from multipart reader and stores it in provided directory
 func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.Database) error {
 	block, err := aes.NewCipher(key)
@@ -105,7 +100,7 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 		}
 	}
 
-	err = db.NewFile(append(pathToArr(dir), part.FileName()), key, n, false)
+	err = db.NewFile(append(database.PathToArr(dir), part.FileName()), key, n, false)
 	if err != nil {
 		return err
 	}
