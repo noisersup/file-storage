@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 
+	"github.com/noisersup/encryptedfs-api/database"
 	l "github.com/noisersup/encryptedfs-api/logger"
 	"github.com/noisersup/encryptedfs-api/server"
-	"github.com/noisersup/encryptedfs-api/server/database"
 )
 
 func main() {
