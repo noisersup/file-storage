@@ -13,7 +13,7 @@ import (
 
 	"github.com/noisersup/encryptedfs-api/auth"
 	l "github.com/noisersup/encryptedfs-api/logger"
-	"github.com/noisersup/encryptedfs-api/server/dirs/database"
+	"github.com/noisersup/encryptedfs-api/server/database"
 )
 
 // Server is a structure responsible for handling all http requests.

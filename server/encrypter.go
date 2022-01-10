@@ -14,7 +14,7 @@ import (
 
 	"github.com/noisersup/encryptedfs-api/logger"
 	l "github.com/noisersup/encryptedfs-api/logger"
-	"github.com/noisersup/encryptedfs-api/server/dirs/database"
+	"github.com/noisersup/encryptedfs-api/server/database"
 )
 
 func encryptBytes(input, key []byte) ([]byte, error) {
