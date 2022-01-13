@@ -68,13 +68,28 @@ func (db *Database) fetchRoot() error {
 		if err != pgx.ErrNoRows {
 			return err
 		}
-		return err
-		//TODO: setRoot
+		l.Log("root entry not found, creating one...")
+		return db.setRoot()
 	}
 
 	db.root = root
 	l.LogV("root: %s", db.root.String())
 	return nil
+}
+
+func (db *Database) setRoot() error {
+	sqlFormula := "INSERT INTO file_tree (encrypted_name) VALUES ($1) RETURNING id;"
+
+	var id uuid.UUID
+
+	row := db.conn.QueryRow(context.Background(), sqlFormula, "root")
+	err := row.Scan(&id)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.conn.Query(context.Background(), "DELETE FROM file_tree_config WHERE TRUE; INSERT INTO file_tree_config (root) VALUES ($1)", id)
+	return err
 }
 
 // Adds file entry to database

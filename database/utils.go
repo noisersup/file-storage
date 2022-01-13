@@ -101,6 +101,18 @@ func deleteFile(conn *pgx.Conn, ctx context.Context, tx pgx.Tx, pathNames []stri
 	return os.Remove(filePath)
 }
 
+// Creates empty file
+func newRootEntry(ctx context.Context, tx pgx.Tx) error {
+	sqlFormula := "INSERT INTO file_tree (encrypted_name) VALUES ($1) RETURNING id;"
+	if _, err := tx.Exec(ctx, sqlFormula, "root"); err != nil {
+		if strings.Contains(err.Error(), "duplicate key value") {
+			return FileExists
+		}
+		return err
+	}
+	return nil
+}
+
 // Creates new file entry in database
 func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uuid.UUID, duplicate int, isDirectory bool) error {
 	log.Print("newFile: ", name)
@@ -108,7 +120,7 @@ func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uu
 		return errors.New("Filename too big")
 	}
 
-	sqlFormula := "INSERT INTO file_tree (encrypted_name,hash, parent_id, duplicate, is_directory) VALUES ($1, $2, $3, $4, $5);"
+	sqlFormula := "INSERT INTO file_tree (encrypted_name, hash, parent_id, duplicate, is_directory) VALUES ($1, $2, $3, $4, $5);"
 	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent, duplicate, isDirectory); err != nil {
 		if strings.Contains(err.Error(), "duplicate key value") {
 			return FileExists
