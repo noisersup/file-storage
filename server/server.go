@@ -88,9 +88,15 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string,
 
 	path := database.PathToArr(paths[0])
 
+	userRoot, err := s.db.GetRoot(user)
+	if err != nil {
+		l.Err("%s", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
 	if len(path) == 1 && path[0] == "" {
 		l.LogV("Listing root directory")
-		files, err := s.db.ListDirectory()
+		files, err := s.db.ListDirectory(userRoot)
 		if err != nil {
 			if err == database.FileNotFound {
 				errResponse(w, http.StatusNotFound, err.Error())
@@ -107,7 +113,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string,
 	}
 
 	l.LogV("Getting file")
-	f, err := s.db.GetFile(path)
+	f, err := s.db.GetFile(path, userRoot)
 	if err != nil {
 		errResponse(w, http.StatusNotFound, "File not found")
 		l.Err(err.Error())
@@ -178,7 +184,13 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	err = encryptMultipart(reader, args[0], key, s.db)
+	userRoot, err := s.db.GetRoot(user)
+	if err != nil {
+		l.Err("%s", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	err = encryptMultipart(reader, args[0], key, s.db, userRoot)
 	if err != nil {
 		l.Err(err.Error())
 		if err == database.FileExists {
@@ -196,7 +208,13 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []string, user string) {
 	l.LogV("Deleting file...")
 
-	err := s.db.DeleteFile(database.PathToArr(paths[0]))
+	userRoot, err := s.db.GetRoot(user)
+	if err != nil {
+		l.Err("%s", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	err = s.db.DeleteFile(database.PathToArr(paths[0]), userRoot)
 	if err != nil {
 		l.Err(err.Error())
 		return
@@ -278,7 +296,7 @@ func serveFile(w http.ResponseWriter, path, name string, key []byte) (error, int
 
 func writeResponse(w http.ResponseWriter, response interface{}, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
+	w.WriteHeader(statusCode) // TODO: http: superfluous response.WriteHeader (server.go:299)
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
 		l.Err("JSON encoding error: %s", err)

@@ -93,11 +93,11 @@ func (db *Database) setRoot() error {
 }
 
 // Adds file entry to database
-func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDirectory bool) error {
+func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDirectory bool, userRoot uuid.UUID) error {
 	if len(pathNames) == 0 {
 		return fmt.Errorf("NewFile: no path provided")
 	}
-	parentId := db.root
+	parentId := userRoot
 	/*
 		Warning!!!
 		Be careful with using recursion in go (also in production environments...).
@@ -110,11 +110,11 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 		}
 
 		// check if parent of file exists
-		f, err := getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
+		f, err := getFile(db.conn, pathNames[:len(pathNames)-1], userRoot)
 		if err != nil {
 			// if parent doesn't exist create it
 			if err == FileNotFound {
-				err = db.NewFile(pathNames[:len(pathNames)-1], key, 0, true)
+				err = db.NewFile(pathNames[:len(pathNames)-1], key, 0, true, userRoot)
 				if err != nil {
 					if err != FileExists {
 						return err
@@ -123,7 +123,7 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 
 				// we're sure that the parent of file exists (i guess...)
 				// now we can get it's database id to link our file to it
-				f, err = getFile(db.conn, pathNames[:len(pathNames)-1], db.root)
+				f, err = getFile(db.conn, pathNames[:len(pathNames)-1], userRoot)
 				if err != nil {
 					return err
 				}
@@ -153,12 +153,14 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 	ex: /a/b/c/d.conf == {"a","b","c","d.conf"}
 	For the best experience use database.PathToArr function
 */
-func (db *Database) GetFile(pathNames []string) (*File, error) {
-	return getFile(db.conn, pathNames, db.root)
+func (db *Database) GetFile(pathNames []string, userRoot uuid.UUID) (*File, error) {
+	return getFile(db.conn, pathNames, userRoot)
 }
 
 // Lists directory with specified id
 // (Without arguments it will use root directory id)
+// WARNING!!! Remember to not use this function without any arguments as an output for an user!!!
+
 func (db *Database) ListDirectory(id ...uuid.UUID) ([]File, error) {
 	var dirId uuid.UUID
 	if len(id) == 0 {
@@ -169,8 +171,8 @@ func (db *Database) ListDirectory(id ...uuid.UUID) ([]File, error) {
 	return listDirectory(db.conn, dirId)
 }
 
-func (db *Database) DeleteFile(pathNames []string) error {
+func (db *Database) DeleteFile(pathNames []string, userRoot uuid.UUID) error {
 	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		return deleteFile(db.conn, context.Background(), tx, pathNames, db.root)
+		return deleteFile(db.conn, context.Background(), tx, pathNames, userRoot)
 	})
 }

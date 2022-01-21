@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 
 	"github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgx"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
 )
 
@@ -59,4 +60,13 @@ func (db *Database) GetKey(username string) ([]byte, error) {
 		return nil, err
 	}
 	return key, nil
+}
+
+func (db *Database) GetRoot(username string) (uuid.UUID, error) {
+	var root uuid.UUID
+	err := db.conn.QueryRow(context.Background(), "SELECT id FROM users where username=$1;", username).Scan(&root)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	return root, nil
 }

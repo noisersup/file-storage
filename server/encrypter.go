@@ -12,6 +12,7 @@ import (
 	"mime/multipart"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/noisersup/encryptedfs-api/database"
 	"github.com/noisersup/encryptedfs-api/logger"
 	l "github.com/noisersup/encryptedfs-api/logger"
@@ -61,7 +62,7 @@ func getHashOfFile(fileName, key []byte) string {
 }
 
 // Encrypts a file from multipart reader and stores it in provided directory
-func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.Database) error {
+func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.Database, userRoot uuid.UUID) error {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err
@@ -100,7 +101,7 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.
 		}
 	}
 
-	err = db.NewFile(append(database.PathToArr(dir), part.FileName()), key, n, false)
+	err = db.NewFile(append(database.PathToArr(dir), part.FileName()), key, n, false, userRoot)
 	if err != nil {
 		return err
 	}

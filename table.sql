@@ -1,5 +1,5 @@
 CREATE TABLE "file_tree" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
   "name" STRING(255),
   "hash" STRING(32),
   "parent_id" UUID,
@@ -13,8 +13,9 @@ CREATE TABLE "file_tree_config" (
 );
 
 CREATE TABLE "users" (
-	"username" STRING(16) NOT NULL,
+  	"id" UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+	"username" STRING(16) NOT NULL UNIQUE,
 	"password" STRING(60) NOT NULL,
-	"key"	   STRING(44) NOT NULL,
+	"key"	   STRING(44) NOT NULL UNIQUE,
   	CONSTRAINT "primary" PRIMARY KEY (username)
 );
