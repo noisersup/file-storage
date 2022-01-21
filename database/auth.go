@@ -8,9 +8,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 
-	"github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgx"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4"
+	l "github.com/noisersup/encryptedfs-api/logger"
 )
 
 /*
@@ -25,14 +24,33 @@ func (db *Database) NewUser(username, hashedPassword string) error {
 	}
 	keyB64 := base64.StdEncoding.EncodeToString(key)
 
-	sqlFormula := "INSERT INTO users (username, password, key) VALUES ($1,$2,$3);"
-	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(context.Background(), sqlFormula, username, hashedPassword, keyB64); err != nil {
-			return err
-		}
-		return nil
-	})
+	var id uuid.UUID
+
+	l.LogV("Inserting into users...")
+	sqlFormula := "INSERT INTO users (username, password, key) VALUES ($1,$2,$3) RETURNING id;"
+	err = db.conn.QueryRow(context.Background(), sqlFormula, username, hashedPassword, keyB64).Scan(&id)
+	if err != nil {
+		return err
+	}
+	l.LogV("SUCCESS!")
+
+	l.LogV("Inserting root %s into files...", id.String())
+	r, err := db.conn.Query(context.Background(), "INSERT INTO file_tree (id,parent_id) VALUES ($1,$2);", id, db.root)
+	//TODO:[ ERROR db: conn busy ] ==> "Use ConnPool to manage access to multiple database connections from multiple goroutines."
+	r.Close()
+
+	if err != nil {
+		//TODO: RemoveUser
+		return err
+	}
+
+	l.LogV("SUCCESS!")
+	return nil
 }
+
+//func (db *Database) RemoveUser(username string) {
+//TODO remove user's db entry, his file entries and his files
+//}
 
 // Returns bcrypted password of provided user
 func (db *Database) GetPasswordOfUser(username string) (string, error) {

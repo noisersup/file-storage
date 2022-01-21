@@ -82,14 +82,30 @@ func (db *Database) setRoot() error {
 
 	var id uuid.UUID
 
+	l.LogV("Inserting root to file_tree")
 	row := db.conn.QueryRow(context.Background(), sqlFormula, "root")
 	err := row.Scan(&id)
 	if err != nil {
 		return err
 	}
+	l.LogV("SUCCESS!")
 
-	_, err = db.conn.Query(context.Background(), "DELETE FROM file_tree_config WHERE TRUE; INSERT INTO file_tree_config (root) VALUES ($1)", id)
-	return err
+	l.LogV("Removing all from file_tree_config")
+	r, err := db.conn.Query(context.Background(), "DELETE FROM file_tree_config WHERE TRUE;")
+	if err != nil {
+		return err
+	}
+	r.Close()
+
+	l.LogV("Inserting root to file_tree_config")
+	r, err = db.conn.Query(context.Background(), "INSERT INTO file_tree_config (root) VALUES ($1)", id)
+	if err != nil {
+		return err
+	}
+	r.Close()
+
+	l.LogV("SUCCESS!")
+	return nil
 }
 
 // Adds file entry to database
