@@ -10,6 +10,7 @@ Feel free to discuss and propose what should be changed!
 |||
 |:exclamation: **Current main goals**
 | Encrypt everything (filenames, databases)  
+| "How it works" section
 | support for flags and better configuration
 | Tests  (we need as much of them as possible...)  
 | Improve Logs 
