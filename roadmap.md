@@ -7,7 +7,7 @@ Feel free to discuss and propose what should be changed!
 
 | Task | Status | Issue |
 |------|--------|-------|
-|
+|||
 |:exclamation: **Current main goals**
 | Encrypt everything (filenames, databases)  
 | support for flags and better configuration
@@ -15,13 +15,13 @@ Feel free to discuss and propose what should be changed!
 | Improve Logs 
 | Better code documentation 
 | Easy deployment (Makefiles,Dockerfiles) 
-|
+|||
 |:space_invader: **Clients** 
 | Login Page  
 | Signup Page
 | File explorer interface
 | CLI client
-|
+|||
 |**:pushpin: Not main goals but will probably be important in future**
 | Move keys and encryption to clients
 | project name, logo and graphics
