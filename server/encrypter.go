@@ -16,6 +16,7 @@ import (
 	"github.com/noisersup/encryptedfs-api/database"
 	"github.com/noisersup/encryptedfs-api/logger"
 	l "github.com/noisersup/encryptedfs-api/logger"
+	"github.com/noisersup/encryptedfs-api/models"
 )
 
 func encryptBytes(input, key []byte) ([]byte, error) {
@@ -62,7 +63,7 @@ func getHashOfFile(fileName, key []byte) string {
 }
 
 // Encrypts a file from multipart reader and stores it in provided directory
-func encryptMultipart(r *multipart.Reader, dir string, key []byte, db *database.Database, userRoot uuid.UUID) error {
+func encryptMultipart(r *multipart.Reader, dir string, key []byte, db models.Database, userRoot uuid.UUID) error {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err

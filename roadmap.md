@@ -12,7 +12,7 @@ Feel free to discuss and propose what should be changed!
 | Encrypt everything (filenames, databases)  
 | "How it works" section
 | support for flags and better configuration
-| Tests  (we need as much of them as possible...)  
+| Tests  (we need as much of them as possible...) | In progress |
 | Improve Logs 
 | Better code documentation 
 | Easy deployment (Makefiles,Dockerfiles) 

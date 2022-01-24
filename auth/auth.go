@@ -8,17 +8,17 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/noisersup/encryptedfs-api/database"
+	"github.com/noisersup/encryptedfs-api/models"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Auth struct {
 	cache redis.Conn
-	db    *database.Database
+	db    models.Database
 }
 
-func InitAuth(userDb *database.Database) (*Auth, error) {
+func InitAuth(userDb models.Database) (*Auth, error) {
 	conn, err := redis.DialURL("redis://localhost")
 	if err != nil {
 		return nil, err

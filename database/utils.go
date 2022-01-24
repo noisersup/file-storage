@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
+	"github.com/noisersup/encryptedfs-api/models"
 )
 
 // Converts path 			("/a/b/c/d.conf")
@@ -41,12 +42,12 @@ var FileExists error = errors.New("File exists")
 */
 
 // Get metadata of specified file from database
-func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error) {
+func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*models.File, error) {
 	if len(pathNames) == 0 {
 		return nil, errors.New("pathNames empty")
 	}
 
-	f := File{}
+	f := models.File{}
 
 	// Get metadata of first file from pathNames
 	sqlQuery := "SELECT id, encrypted_name, hash, parent_id,duplicate, is_directory FROM file_tree WHERE encrypted_name = $1 AND parent_id = $2;"
@@ -58,7 +59,7 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*File, error
 	fileFound := false
 
 	for rows.Next() {
-		if err := rows.Scan(&f.Id, &f.Name, &f.Hash, &f.parentId, &f.Duplicate, &f.IsDirectory); err != nil {
+		if err := rows.Scan(&f.Id, &f.Name, &f.Hash, &f.ParentId, &f.Duplicate, &f.IsDirectory); err != nil {
 			return nil, err
 		}
 		fileFound = true
@@ -131,8 +132,8 @@ func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uu
 }
 
 // List directory with specified id
-func listDirectory(conn *pgx.Conn, id uuid.UUID) ([]File, error) {
-	files := []File{}
+func listDirectory(conn *pgx.Conn, id uuid.UUID) ([]models.File, error) {
+	files := []models.File{}
 	sqlFormula := "SELECT id, encrypted_name, hash, parent_id,duplicate, is_directory FROM file_tree WHERE parent_id = $1 ;"
 	rows, err := conn.Query(context.Background(), sqlFormula, id)
 
@@ -141,8 +142,8 @@ func listDirectory(conn *pgx.Conn, id uuid.UUID) ([]File, error) {
 	}
 
 	for rows.Next() {
-		f := File{}
-		if err := rows.Scan(&f.Id, &f.Name, &f.Hash, &f.parentId, &f.Duplicate, &f.IsDirectory); err != nil {
+		f := models.File{}
+		if err := rows.Scan(&f.Id, &f.Name, &f.Hash, &f.ParentId, &f.Duplicate, &f.IsDirectory); err != nil {
 			return nil, err
 		}
 		files = append(files, f)

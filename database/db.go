@@ -6,6 +6,7 @@ import (
 	"os"
 
 	l "github.com/noisersup/encryptedfs-api/logger"
+	"github.com/noisersup/encryptedfs-api/models"
 
 	"github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgx"
 	"github.com/google/uuid"
@@ -15,15 +16,6 @@ import (
 type Database struct {
 	conn *pgx.Conn // database connection
 	root uuid.UUID // id of the root directory in database
-}
-
-type File struct {
-	Id          uuid.UUID
-	Name        string
-	Hash        string
-	parentId    uuid.UUID
-	Duplicate   int
-	IsDirectory bool
 }
 
 // Connects to database with provided data
@@ -169,7 +161,7 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 	ex: /a/b/c/d.conf == {"a","b","c","d.conf"}
 	For the best experience use database.PathToArr function
 */
-func (db *Database) GetFile(pathNames []string, userRoot uuid.UUID) (*File, error) {
+func (db *Database) GetFile(pathNames []string, userRoot uuid.UUID) (*models.File, error) {
 	return getFile(db.conn, pathNames, userRoot)
 }
 
@@ -177,7 +169,7 @@ func (db *Database) GetFile(pathNames []string, userRoot uuid.UUID) (*File, erro
 // (Without arguments it will use root directory id)
 // WARNING!!! Remember to not use this function without any arguments as an output for an user!!!
 
-func (db *Database) ListDirectory(id ...uuid.UUID) ([]File, error) {
+func (db *Database) ListDirectory(id ...uuid.UUID) ([]models.File, error) {
 	var dirId uuid.UUID
 	if len(id) == 0 {
 		dirId = db.root

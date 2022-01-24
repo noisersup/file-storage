@@ -14,16 +14,17 @@ import (
 	"github.com/noisersup/encryptedfs-api/auth"
 	"github.com/noisersup/encryptedfs-api/database"
 	l "github.com/noisersup/encryptedfs-api/logger"
+	"github.com/noisersup/encryptedfs-api/models"
 )
 
 // Server is a structure responsible for handling all http requests.
 type Server struct {
 	maxUpload int64 //TODO: implement maxuploads
-	db        *database.Database
+	db        models.Database
 	auth      *auth.Auth
 }
 
-func InitServer(db *database.Database) error {
+func InitServer(db models.Database) error {
 	a, err := auth.InitAuth(db)
 	if err != nil {
 		return err
