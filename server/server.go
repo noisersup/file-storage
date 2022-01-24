@@ -22,14 +22,22 @@ type Server struct {
 	maxUpload int64 //TODO: implement maxuploads
 	db        models.Database
 	auth      *auth.Auth
+	filesPath string
 }
 
-func InitServer(db models.Database) error {
+func InitServer(db models.Database, filesPath ...string) error {
 	a, err := auth.InitAuth(db)
 	if err != nil {
 		return err
 	}
-	s := Server{1024 << 20, db, a}
+
+	s := Server{maxUpload: 1024 << 20, db: db, auth: a}
+
+	if len(filesPath) == 0 {
+		s.filesPath = "./files"
+	} else {
+		s.filesPath = filesPath[0]
+	}
 
 	//Handle requests
 	handlers := []struct {
@@ -39,7 +47,7 @@ func InitServer(db models.Database) error {
 		authNeeded bool
 	}{
 		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"POST"}, s.uploadFile, true}, // /drive/path/of/target/directory ex. posting d.jpg with /drive/images/ will put to images/d.jpg and /drive/ will result with puting to root dir
-		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"GET"}, s.getFile, true},
+		{regexp.MustCompile(`^/drive(?:/(.*[^/]))?$`), []string{"GET"}, s.GetFile, true},
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile, true},
 		{regexp.MustCompile(`^/signin$`), []string{"POST"}, s.signIn, false},
 		{regexp.MustCompile(`^/signup$`), []string{"POST"}, s.signUp, false},
@@ -83,7 +91,7 @@ func InitServer(db models.Database) error {
 
 // Handler function for GET requests.
 // Decrypts file and send it in chunks to user
-func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string, user string) {
+func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string, user string) {
 	l.Log(user)
 	l.LogV("Fetching file...")
 
@@ -137,9 +145,9 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, paths []string,
 
 	var filePath string
 	if f.Duplicate == 0 {
-		filePath = fmt.Sprintf("./files/%s", f.Hash)
+		filePath = fmt.Sprintf("%s/%s", s.filesPath, f.Hash)
 	} else {
-		filePath = fmt.Sprintf("./files/%s%d", f.Hash, f.Duplicate)
+		filePath = fmt.Sprintf("%s/%s%d", s.filesPath, f.Hash, f.Duplicate)
 	}
 
 	key, err := s.db.GetKey(user)
