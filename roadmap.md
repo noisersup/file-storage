@@ -17,6 +17,7 @@ Feel free to discuss and propose what should be changed!
 | Better code documentation 
 | Easy deployment (Makefiles,Dockerfiles) | In progress | [#3](https://github.com/noisersup/file-storage/issues/3) |
 | Improve Logs 
+| Standardize http responses | | [#4](https://github.com/noisersup/file-storage/issues/4) |
 |||
 |:space_invader: **Clients** 
 | Login Page  
