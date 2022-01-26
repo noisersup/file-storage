@@ -15,7 +15,8 @@ Feel free to discuss and propose what should be changed!
 | Tests  (we need as much of them as possible...) | In progress | [#2](https://github.com/noisersup/file-storage/issues/2) |
 | Improve Logs 
 | Better code documentation 
-| Easy deployment (Makefiles,Dockerfiles) 
+| Easy deployment (Makefiles,Dockerfiles) | In progress | [#3](https://github.com/noisersup/file-storage/issues/3) |
+| Improve Logs 
 |||
 |:space_invader: **Clients** 
 | Login Page  
