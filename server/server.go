@@ -55,6 +55,7 @@ func InitServer(db models.Database, filesPath ...string) error {
 	}
 
 	hanFunc := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		l.Log("%s %s", r.Method, r.URL.Path)
 		for _, handler := range handlers {
 			match := handler.regex.FindStringSubmatch(r.URL.Path)
