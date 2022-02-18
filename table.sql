@@ -1,6 +1,6 @@
 CREATE TABLE "file_tree" (
   "id" UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-  "name" STRING(255),
+  "encrypted_name" STRING(255),
   "hash" STRING(32),
   "parent_id" UUID,
   CONSTRAINT "primary" PRIMARY KEY (id ASC)
