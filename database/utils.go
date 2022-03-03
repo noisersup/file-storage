@@ -122,6 +122,7 @@ func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uu
 	}
 
 	sqlFormula := "INSERT INTO file_tree (encrypted_name, hash, parent_id, duplicate, is_directory) VALUES ($1, $2, $3, $4, $5);"
+	log.Print(len(hash), " ", hash)
 	if _, err := tx.Exec(ctx, sqlFormula, name, hash, parent, duplicate, isDirectory); err != nil {
 		if strings.Contains(err.Error(), "duplicate key value") {
 			return FileExists
