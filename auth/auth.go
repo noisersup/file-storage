@@ -110,44 +110,38 @@ func (a *Auth) Authorize(w http.ResponseWriter, r *http.Request) string {
 	return fmt.Sprintf("%s", response)
 }
 
-func (a *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
+func (a *Auth) Refresh(r *http.Request) (*http.Cookie, int) {
 	cookie, err := r.Cookie("session_token")
 	if err != nil {
 		if err == http.ErrNoCookie {
-			w.WriteHeader(http.StatusUnauthorized)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
+			return nil, http.StatusUnauthorized
 		}
-		return
+		return nil, http.StatusBadRequest
 	}
 
 	userToken := cookie.Value
 
 	response, err := a.cache.Do("GET", userToken)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return nil, http.StatusInternalServerError
 	}
 	if response == nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
+		return nil, http.StatusUnauthorized
 	}
 
 	newToken := uuid.NewV4().String()
 	_, err = a.cache.Do("SETEX", newToken, "120", fmt.Sprintf("%s", response))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return nil, http.StatusInternalServerError
 	}
 	_, err = a.cache.Do("DEL", userToken)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return nil, http.StatusInternalServerError
 	}
 
-	http.SetCookie(w, &http.Cookie{
+	return &http.Cookie{
 		Name:    "session_token",
 		Value:   newToken,
 		Expires: time.Now().Add(120 * time.Second),
-	})
+	}, http.StatusOK
 }

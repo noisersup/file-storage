@@ -101,7 +101,7 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string,
 	userRoot, err := s.db.GetRoot(user)
 	if err != nil {
 		l.Err("%s", err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		resp500(w)
 	}
 
 	if len(path) == 1 && path[0] == "" {
@@ -109,7 +109,8 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string,
 		files, err := s.db.ListDirectory(userRoot)
 		if err != nil {
 			if err == database.FileNotFound {
-				errResponse(w, http.StatusNotFound, err.Error())
+				resp404(w, "Directory is empty")
+				return
 			}
 			l.Err(err.Error())
 			return
@@ -125,8 +126,7 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string,
 	l.LogV("Getting file")
 	f, err := s.db.GetFile(path, userRoot)
 	if err != nil {
-		errResponse(w, http.StatusNotFound, "File not found")
-		l.Err(err.Error())
+		resp404(w)
 		return
 	}
 	if f.IsDirectory {
@@ -134,6 +134,7 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string,
 		files, err := s.db.ListDirectory(f.Id)
 		if err != nil {
 			l.Err(err.Error())
+			resp500(w)
 			return
 		}
 		outFiles := []ListedFile{}
@@ -154,7 +155,8 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string,
 	key, err := s.db.GetKey(user)
 	if err != nil {
 		l.Err("%s", err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		resp500(w)
+		return
 	}
 
 	l.LogV("Serving file")
@@ -162,17 +164,18 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string,
 	if err != nil {
 		switch status {
 		case http.StatusNotFound:
-			errResponse(w, status, "File not found")
+			resp404(w, "File not found")
 			l.Err("File %s not found [error: %s]", filePath, err.Error())
 			break
 		case http.StatusInternalServerError:
-			serverError(w)
+			resp500(w)
 			l.Err("getFile Internal error: %s", err.Error())
 			break
 		default:
-			serverError(w)
+			resp500(w)
 			l.Warn("getFile Undefined error: %s", err.Error())
 		}
+		return
 	}
 	l.LogV("File transfer done!")
 }
@@ -184,31 +187,35 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 	reader, err := r.MultipartReader()
 	if err != nil {
 		l.Err(err.Error())
-		errResponse(w, http.StatusInternalServerError, "Internal error")
+		resp500(w)
 		return
 	}
 
 	key, err := s.db.GetKey(user)
 	if err != nil {
 		l.Err("%s", err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		resp500(w)
+		return
 	}
 
 	userRoot, err := s.db.GetRoot(user)
 	if err != nil {
 		l.Err("%s", err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		resp500(w)
+		return
 	}
 
 	err = encryptMultipart(reader, args[0], key, s.db, userRoot)
 	if err != nil {
 		l.Err(err.Error())
 		if err == database.FileExists {
-			errResponse(w, http.StatusNotFound, "File not found")
+			resp409(w, "File already exists")
+			return
 		}
-		errResponse(w, http.StatusInternalServerError, "Internal error")
+		resp500(w)
 		return
 	}
+	resp201(w, nil)
 	l.LogV("File uploaded!")
 }
 
@@ -221,42 +228,44 @@ func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []stri
 	userRoot, err := s.db.GetRoot(user)
 	if err != nil {
 		l.Err("%s", err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		resp500(w)
+		return
 	}
 
 	err = s.db.DeleteFile(database.PathToArr(paths[0]), userRoot)
 	if err != nil {
 		l.Err(err.Error())
+		resp500(w)
 		return
 	}
-}
-
-type Credentials struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
 }
 
 func (s *Server) signUp(w http.ResponseWriter, r *http.Request, _ []string, _ string) {
 	var credentials Credentials
 	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		resp400(w)
 		return
 	}
 	status := s.auth.Signup(credentials.Username, credentials.Password)
 	log.Print(status)
-	w.WriteHeader(status)
+	resp201(w, nil)
 }
 
 func (s *Server) signIn(w http.ResponseWriter, r *http.Request, _ []string, _ string) {
 	var credentials Credentials
 	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		resp400(w)
 		return
 	}
 
 	sessionToken, status := s.auth.Signin(credentials.Username, credentials.Password)
 	if status != http.StatusOK {
-		w.WriteHeader(status)
+		switch status {
+		case http.StatusUnauthorized:
+			resp401(w, "Incorrect login or password")
+		case http.StatusInternalServerError:
+			resp500(w)
+		}
 		return
 	}
 
@@ -268,7 +277,21 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request, _ []string, _ st
 }
 
 func (s *Server) refresh(w http.ResponseWriter, r *http.Request, _ []string, _ string) {
-	s.auth.Refresh(w, r)
+	cookie, status := s.auth.Refresh(r)
+	if status != http.StatusOK {
+		switch status {
+		case http.StatusUnauthorized:
+			resp401(w)
+		case http.StatusBadRequest:
+			resp400(w)
+		case http.StatusInternalServerError:
+			resp500(w)
+		}
+		return
+	}
+
+	http.SetCookie(w, cookie)
+	respOK(w, nil)
 }
 
 // serveFile decrypts file on provided path and writes it's to ResponseWriter
@@ -301,7 +324,7 @@ func serveFile(w http.ResponseWriter, path, name string, key []byte) (error, int
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func writeResponse(w http.ResponseWriter, response interface{}, statusCode int) {
@@ -312,9 +335,52 @@ func writeResponse(w http.ResponseWriter, response interface{}, statusCode int) 
 		l.Err("JSON encoding error: %s", err)
 	}
 }
+func respOK(w http.ResponseWriter, response interface{}) {
+	writeResponse(w, response, http.StatusOK)
+}
 
-func serverError(w http.ResponseWriter) {
-	errResponse(w, http.StatusInternalServerError, "Server error")
+func resp201(w http.ResponseWriter, response interface{}) {
+	writeResponse(w, response, http.StatusCreated)
+}
+
+func resp400(w http.ResponseWriter, msg ...interface{}) {
+	response := "Bad Request"
+	if msg != nil {
+		response = fmt.Sprint(msg[0])
+	}
+	errResponse(w, http.StatusBadRequest, response)
+}
+
+func resp401(w http.ResponseWriter, msg ...interface{}) {
+	response := "Unauthorized"
+	if msg != nil {
+		response = fmt.Sprint(msg[0])
+	}
+	errResponse(w, http.StatusUnauthorized, response)
+}
+
+func resp404(w http.ResponseWriter, msg ...interface{}) {
+	response := "Content not found"
+	if msg != nil {
+		response = fmt.Sprint(msg[0])
+	}
+	errResponse(w, http.StatusNotFound, response)
+}
+
+func resp409(w http.ResponseWriter, msg ...interface{}) {
+	response := "Conflict"
+	if msg != nil {
+		response = fmt.Sprint(msg[0])
+	}
+	errResponse(w, http.StatusConflict, response)
+}
+
+func resp500(w http.ResponseWriter, msg ...interface{}) {
+	response := "Internal server error"
+	if msg != nil {
+		response = fmt.Sprint(msg[0])
+	}
+	errResponse(w, http.StatusInternalServerError, response)
 }
 
 func errResponse(w http.ResponseWriter, status int, msg string) {

@@ -15,3 +15,9 @@ type ListedFile struct {
 	Name        string `json:"name"`
 	IsDirectory bool   `json:"isDirectory"`
 }
+
+// REQUESTS
+type Credentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
