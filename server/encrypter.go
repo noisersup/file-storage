@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"os"
 
@@ -102,11 +103,17 @@ func encryptMultipart(r *multipart.Reader, dir string, key []byte, db models.Dat
 		}
 	}
 
+	log.Print(part.FileName())
+
 	err = db.NewFile(append(database.PathToArr(dir), part.FileName()), key, n, false, userRoot)
 	if err != nil {
 		return err
 	}
 
+	err = os.MkdirAll("./files", os.ModePerm)
+	if err != nil {
+		return err
+	}
 	outFile, err := os.OpenFile(newPath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return err
