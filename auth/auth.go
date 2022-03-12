@@ -15,18 +15,29 @@ import (
 )
 
 type Auth struct {
-	cache redis.Conn
+	cache *redis.Pool
 	db    models.Database
 }
 
 func InitAuth(userDb models.Database) (*Auth, error) {
-	conn, err := redis.DialURL("redis://localhost")
-	if err != nil {
-		return nil, err
+	pool := &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.DialURL("redis://localhost")
+			if err != nil {
+				return nil, err
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
 	}
 
 	a := Auth{
-		cache: conn,
+		cache: pool,
 		db:    userDb,
 	}
 
@@ -54,7 +65,9 @@ func (a *Auth) Signin(username string, password string) (string, int) {
 
 	sessionToken := uuid.NewV4().String()
 
-	_, err = a.cache.Do("SETEX", sessionToken, "120", username)
+	conn := a.cache.Get()
+	_, err = conn.Do("SETEX", sessionToken, "120", username)
+	conn.Close()
 	if err != nil {
 		l.Err("redis error: %s", err.Error())
 		return "", http.StatusInternalServerError
@@ -99,7 +112,9 @@ func (a *Auth) Authorize(w http.ResponseWriter, r *http.Request) string {
 	}
 	token := c.Value
 
-	response, err := a.cache.Do("GET", token)
+	conn := a.cache.Get()
+	response, err := conn.Do("GET", token)
+	conn.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return ""
@@ -123,20 +138,25 @@ func (a *Auth) Refresh(r *http.Request) (*http.Cookie, int) {
 
 	userToken := cookie.Value
 
-	response, err := a.cache.Do("GET", userToken)
+	conn := a.cache.Get()
+	response, err := conn.Do("GET", userToken)
 	if err != nil {
+		conn.Close()
 		return nil, http.StatusInternalServerError
 	}
 	if response == nil {
+		conn.Close()
 		return nil, http.StatusUnauthorized
 	}
 
 	newToken := uuid.NewV4().String()
-	_, err = a.cache.Do("SETEX", newToken, "120", fmt.Sprintf("%s", response))
+	_, err = conn.Do("SETEX", newToken, "120", fmt.Sprintf("%s", response))
 	if err != nil {
+		conn.Close()
 		return nil, http.StatusInternalServerError
 	}
-	_, err = a.cache.Do("DEL", userToken)
+	_, err = conn.Do("DEL", userToken)
+	conn.Close()
 	if err != nil {
 		return nil, http.StatusInternalServerError
 	}
