@@ -28,15 +28,14 @@ func (db *Database) NewUser(username, hashedPassword string) error {
 
 	l.LogV("Inserting into users...")
 	sqlFormula := "INSERT INTO users (username, password, key) VALUES ($1,$2,$3) RETURNING id;"
-	err = db.conn.QueryRow(context.Background(), sqlFormula, username, hashedPassword, keyB64).Scan(&id)
+	err = db.pool.QueryRow(context.Background(), sqlFormula, username, hashedPassword, keyB64).Scan(&id)
 	if err != nil {
 		return err
 	}
 	l.LogV("SUCCESS!")
 
 	l.LogV("Inserting root %s into files...", id.String())
-	r, err := db.conn.Query(context.Background(), "INSERT INTO file_tree (id,parent_id) VALUES ($1,$2);", id, db.root)
-	//TODO:[ ERROR db: conn busy ] ==> "Use ConnPool to manage access to multiple database connections from multiple goroutines."
+	r, err := db.pool.Query(context.Background(), "INSERT INTO file_tree (id,parent_id) VALUES ($1,$2);", id, db.root)
 	r.Close()
 
 	if err != nil {
@@ -55,7 +54,7 @@ func (db *Database) NewUser(username, hashedPassword string) error {
 // Returns bcrypted password of provided user
 func (db *Database) GetPasswordOfUser(username string) (string, error) {
 	var expectedPassword string
-	err := db.conn.QueryRow(context.Background(), "SELECT password FROM users WHERE username=$1;", username).Scan(&expectedPassword)
+	err := db.pool.QueryRow(context.Background(), "SELECT password FROM users WHERE username=$1;", username).Scan(&expectedPassword)
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +67,7 @@ gets hashing key of user
 func (db *Database) GetKey(username string) ([]byte, error) {
 	var b64Decoded string
 	sqlFormula := "SELECT key FROM users WHERE username=$1;"
-	err := db.conn.QueryRow(context.Background(), sqlFormula, username).Scan(&b64Decoded)
+	err := db.pool.QueryRow(context.Background(), sqlFormula, username).Scan(&b64Decoded)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +81,7 @@ func (db *Database) GetKey(username string) ([]byte, error) {
 
 func (db *Database) GetRoot(username string) (uuid.UUID, error) {
 	var root uuid.UUID
-	err := db.conn.QueryRow(context.Background(), "SELECT id FROM users where username=$1;", username).Scan(&root)
+	err := db.pool.QueryRow(context.Background(), "SELECT id FROM users where username=$1;", username).Scan(&root)
 	if err != nil {
 		return uuid.UUID{}, err
 	}

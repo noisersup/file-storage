@@ -36,8 +36,7 @@ func Test_GetFile(t *testing.T) {
 type MockDB struct {
 }
 
-func (m *MockDB) Close() error {
-	return nil
+func (m *MockDB) Close() {
 }
 
 func (m *MockDB) NewFile(pathNames []string, key []byte, duplicate int, isDirectory bool, userRoot uuid.UUID) error {

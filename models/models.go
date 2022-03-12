@@ -12,7 +12,7 @@ type File struct {
 }
 
 type Database interface {
-	Close() error
+	Close()
 	NewFile(pathNames []string, key []byte, duplicate int, isDirectory bool, userRoot uuid.UUID) error
 	GetFile(pathNames []string, userRoot uuid.UUID) (*File, error)
 	ListDirectory(id ...uuid.UUID) ([]File, error)

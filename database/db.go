@@ -11,29 +11,30 @@ import (
 	"github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgx"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type Database struct {
-	conn *pgx.Conn // database connection
-	root uuid.UUID // id of the root directory in database
+	pool *pgxpool.Pool // database connection
+	root uuid.UUID     // id of the root directory in database
 }
 
 // Connects to database with provided data
 // and returns database object
 func ConnectDB(uri, database string, root string) (*Database, error) {
-	config, err := pgx.ParseConfig(os.ExpandEnv(uri))
+	config, err := pgxpool.ParseConfig(os.ExpandEnv(uri))
 	if err != nil {
 		return nil, err
 	}
 
-	config.Database = database
+	config.ConnConfig.Database = database
 
-	conn, err := pgx.ConnectConfig(context.Background(), config)
+	pool, err := pgxpool.ConnectConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
 	}
 
-	db := Database{conn: conn}
+	db := Database{pool: pool}
 
 	err = db.fetchRoot()
 	if err != nil {
@@ -45,15 +46,16 @@ func ConnectDB(uri, database string, root string) (*Database, error) {
 
 // Close database connection
 // ( conn.Close alias )
-func (db *Database) Close() error {
+func (db *Database) Close() {
 	l.Log("Closing database...")
-	return db.conn.Close(context.Background())
+	db.pool.Close()
+	l.Log("All database connections closed.")
 }
 
 // Fetch root variable in database object from file_Tree_config database
 // If not present - creates root entry and insert its id to config db
 func (db *Database) fetchRoot() error {
-	row := db.conn.QueryRow(context.Background(), "SELECT root FROM file_tree_config;")
+	row := db.pool.QueryRow(context.Background(), "SELECT root FROM file_tree_config;")
 	var root uuid.UUID
 	err := row.Scan(&root)
 	if err != nil {
@@ -75,7 +77,7 @@ func (db *Database) setRoot() error {
 	var id uuid.UUID
 
 	l.LogV("Inserting root to file_tree")
-	row := db.conn.QueryRow(context.Background(), sqlFormula, "root")
+	row := db.pool.QueryRow(context.Background(), sqlFormula, "root")
 	err := row.Scan(&id)
 	if err != nil {
 		return err
@@ -83,18 +85,18 @@ func (db *Database) setRoot() error {
 	l.LogV("SUCCESS!")
 
 	l.LogV("Removing all from file_tree_config")
-	r, err := db.conn.Query(context.Background(), "DELETE FROM file_tree_config WHERE TRUE;")
+	r, err := db.pool.Query(context.Background(), "DELETE FROM file_tree_config WHERE TRUE;")
+	r.Close()
 	if err != nil {
 		return err
 	}
-	r.Close()
 
 	l.LogV("Inserting root to file_tree_config")
-	r, err = db.conn.Query(context.Background(), "INSERT INTO file_tree_config (root) VALUES ($1)", id)
+	r, err = db.pool.Query(context.Background(), "INSERT INTO file_tree_config (root) VALUES ($1)", id)
+	r.Close()
 	if err != nil {
 		return err
 	}
-	r.Close()
 
 	l.LogV("SUCCESS!")
 	return nil
@@ -118,7 +120,7 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 		}
 
 		// check if parent of file exists
-		f, err := getFile(db.conn, pathNames[:len(pathNames)-1], userRoot)
+		f, err := getFile(db.pool, pathNames[:len(pathNames)-1], userRoot)
 		if err != nil {
 			// if parent doesn't exist create it
 			if err == FileNotFound {
@@ -131,7 +133,7 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 
 				// we're sure that the parent of file exists (i guess...)
 				// now we can get it's database id to link our file to it
-				f, err = getFile(db.conn, pathNames[:len(pathNames)-1], userRoot)
+				f, err = getFile(db.pool, pathNames[:len(pathNames)-1], userRoot)
 				if err != nil {
 					return err
 				}
@@ -149,7 +151,7 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 	if err != nil {
 		return err
 	}
-	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
+	return crdbpgx.ExecuteTx(context.Background(), db.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
 		return newFile(context.Background(), tx, pathNames[len(pathNames)-1], getHashOfFile([]byte(pathNames[len(pathNames)-1]), key), parentId, duplicate, isDirectory)
 	})
 }
@@ -162,7 +164,7 @@ func (db *Database) NewFile(pathNames []string, key []byte, duplicate int, isDir
 	For the best experience use database.PathToArr function
 */
 func (db *Database) GetFile(pathNames []string, userRoot uuid.UUID) (*models.File, error) {
-	return getFile(db.conn, pathNames, userRoot)
+	return getFile(db.pool, pathNames, userRoot)
 }
 
 // Lists directory with specified id
@@ -176,11 +178,11 @@ func (db *Database) ListDirectory(id ...uuid.UUID) ([]models.File, error) {
 	} else {
 		dirId = id[0]
 	}
-	return listDirectory(db.conn, dirId)
+	return listDirectory(db.pool, dirId)
 }
 
 func (db *Database) DeleteFile(pathNames []string, userRoot uuid.UUID) error {
-	return crdbpgx.ExecuteTx(context.Background(), db.conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		return deleteFile(db.conn, context.Background(), tx, pathNames, userRoot)
+	return crdbpgx.ExecuteTx(context.Background(), db.pool, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		return deleteFile(db.pool, context.Background(), tx, pathNames, userRoot)
 	})
 }

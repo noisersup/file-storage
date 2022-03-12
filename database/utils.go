@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/noisersup/encryptedfs-api/models"
 )
 
@@ -42,7 +43,7 @@ var FileExists error = errors.New("File exists")
 */
 
 // Get metadata of specified file from database
-func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*models.File, error) {
+func getFile(pool *pgxpool.Pool, pathNames []string, parent uuid.UUID) (*models.File, error) {
 	if len(pathNames) == 0 {
 		return nil, errors.New("pathNames empty")
 	}
@@ -51,8 +52,9 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*models.File
 
 	// Get metadata of first file from pathNames
 	sqlQuery := "SELECT id, encrypted_name, hash, parent_id,duplicate, is_directory FROM file_tree WHERE encrypted_name = $1 AND parent_id = $2;"
-	rows, err := conn.Query(context.Background(), sqlQuery, pathNames[0], parent)
+	rows, err := pool.Query(context.Background(), sqlQuery, pathNames[0], parent)
 	if err != nil {
+		rows.Close()
 		return nil, err
 	}
 
@@ -65,11 +67,11 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*models.File
 		fileFound = true
 	}
 
+	rows.Close()
+
 	if !fileFound {
 		return nil, FileNotFound
 	}
-
-	rows.Close()
 
 	// Closes recursion
 	// if it's last file in path returns it
@@ -77,12 +79,12 @@ func getFile(conn *pgx.Conn, pathNames []string, parent uuid.UUID) (*models.File
 		return &f, nil
 	}
 
-	return getFile(conn, pathNames[1:], f.Id)
+	return getFile(pool, pathNames[1:], f.Id)
 }
 
 // deletes file entry from database and removes it from disk
-func deleteFile(conn *pgx.Conn, ctx context.Context, tx pgx.Tx, pathNames []string, root uuid.UUID) error {
-	f, err := getFile(conn, pathNames, root)
+func deleteFile(pool *pgxpool.Pool, ctx context.Context, tx pgx.Tx, pathNames []string, root uuid.UUID) error {
+	f, err := getFile(pool, pathNames, root)
 	if err != nil {
 		return err
 	}
@@ -133,12 +135,13 @@ func newFile(ctx context.Context, tx pgx.Tx, name string, hash string, parent uu
 }
 
 // List directory with specified id
-func listDirectory(conn *pgx.Conn, id uuid.UUID) ([]models.File, error) {
+func listDirectory(pool *pgxpool.Pool, id uuid.UUID) ([]models.File, error) {
 	files := []models.File{}
 	sqlFormula := "SELECT id, encrypted_name, hash, parent_id,duplicate, is_directory FROM file_tree WHERE parent_id = $1 ;"
-	rows, err := conn.Query(context.Background(), sqlFormula, id)
+	rows, err := pool.Query(context.Background(), sqlFormula, id)
 
 	if err != nil {
+		rows.Close()
 		return nil, err
 	}
 
@@ -149,12 +152,11 @@ func listDirectory(conn *pgx.Conn, id uuid.UUID) ([]models.File, error) {
 		}
 		files = append(files, f)
 	}
+	rows.Close()
 
 	if len(files) == 0 {
 		return nil, FileNotFound
 	}
-
-	rows.Close()
 
 	return files, nil
 }
