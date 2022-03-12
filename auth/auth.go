@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	l "github.com/noisersup/encryptedfs-api/logger"
 	"github.com/noisersup/encryptedfs-api/models"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -43,7 +44,7 @@ func (a *Auth) Signin(username string, password string) (string, int) {
 		if strings.Contains(err.Error(), "no rows") {
 			return "", http.StatusUnauthorized
 		}
-		log.Printf("db.Query error: %s", err.Error())
+		l.Err("db.Query error: %s", err.Error())
 		return "", http.StatusInternalServerError
 	}
 
@@ -55,6 +56,7 @@ func (a *Auth) Signin(username string, password string) (string, int) {
 
 	_, err = a.cache.Do("SETEX", sessionToken, "120", username)
 	if err != nil {
+		l.Err("redis error: %s", err.Error())
 		return "", http.StatusInternalServerError
 	}
 
