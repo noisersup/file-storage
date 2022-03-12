@@ -329,7 +329,7 @@ func serveFile(w http.ResponseWriter, path, name string, key []byte) (error, int
 
 func writeResponse(w http.ResponseWriter, response interface{}, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode) // TODO: http: superfluous response.WriteHeader (server.go:299)
+	w.WriteHeader(statusCode)
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
 		l.Err("JSON encoding error: %s", err)
@@ -384,7 +384,6 @@ func resp500(w http.ResponseWriter, msg ...interface{}) {
 }
 
 func errResponse(w http.ResponseWriter, status int, msg string) {
-	w.WriteHeader(status)
 	w.Header().Del("Content-Disposition")
 	w.Header().Del("Content-Type")
 	writeResponse(w, ErrResponse{msg}, status)
