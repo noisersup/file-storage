@@ -196,7 +196,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request, paths []string, 
 		}
 		return
 	}
-	respOK(w, nil)
+	respOK(w)
 }
 
 // Handler function for POST requests.
@@ -234,7 +234,7 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 		resp500(w)
 		return
 	}
-	resp201(w, nil)
+	resp201(w)
 	l.LogV("File uploaded!")
 }
 
@@ -267,7 +267,7 @@ func (s *Server) signUp(w http.ResponseWriter, r *http.Request, _ []string, _ st
 	}
 	status := s.auth.Signup(credentials.Username, credentials.Password)
 	log.Print(status)
-	resp201(w, nil)
+	resp201(w)
 }
 
 func (s *Server) signIn(w http.ResponseWriter, r *http.Request, _ []string, _ string) {
@@ -310,7 +310,7 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request, _ []string, _ s
 	}
 
 	http.SetCookie(w, cookie)
-	respOK(w, nil)
+	respOK(w)
 }
 
 // serveFile decrypts file on provided path and writes it's to ResponseWriter
@@ -354,12 +354,20 @@ func writeResponse(w http.ResponseWriter, response interface{}, statusCode int) 
 		l.Err("JSON encoding error: %s", err)
 	}
 }
-func respOK(w http.ResponseWriter, response interface{}) {
-	writeResponse(w, response, http.StatusOK)
+func respOK(w http.ResponseWriter, response ...interface{}) {
+	var resp interface{} = ErrResponse{}
+	if response != nil {
+		resp = response
+	}
+	writeResponse(w, resp, http.StatusOK)
 }
 
-func resp201(w http.ResponseWriter, response interface{}) {
-	writeResponse(w, response, http.StatusCreated)
+func resp201(w http.ResponseWriter, response ...interface{}) {
+	var resp interface{} = ErrResponse{}
+	if response != nil {
+		resp = response
+	}
+	writeResponse(w, resp, http.StatusCreated)
 }
 
 func resp400(w http.ResponseWriter, msg ...interface{}) {
