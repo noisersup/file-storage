@@ -105,7 +105,7 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string,
 		resp500(w)
 	}
 
-	if len(path) == 1 && path[0] == "" {
+	if len(path) == 0 {
 		l.LogV("Listing root directory")
 		files, err := s.db.ListDirectory(userRoot)
 		if err != nil {
