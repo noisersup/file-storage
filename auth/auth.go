@@ -97,7 +97,7 @@ func (a *Auth) Signup(username string, password string) int {
 		}
 	}
 
-	return http.StatusOK
+	return http.StatusCreated
 }
 
 func (a *Auth) Authorize(w http.ResponseWriter, r *http.Request) string {

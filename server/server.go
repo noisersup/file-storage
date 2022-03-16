@@ -267,6 +267,15 @@ func (s *Server) signUp(w http.ResponseWriter, r *http.Request, _ []string, _ st
 	}
 	status := s.auth.Signup(credentials.Username, credentials.Password)
 	log.Print(status)
+	if status != http.StatusCreated {
+		switch status {
+		case http.StatusConflict:
+			resp409(w)
+		case http.StatusInternalServerError:
+			resp500(w)
+		}
+		return
+	}
 	resp201(w)
 }
 
