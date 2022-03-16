@@ -51,7 +51,8 @@ func InitServer(db models.Database, filesPath ...string) error {
 		{regexp.MustCompile(`^/drive/(.*[^/])$`), []string{"DELETE"}, s.deleteFile, true},
 		{regexp.MustCompile(`^/signin$`), []string{"POST"}, s.signIn, false},
 		{regexp.MustCompile(`^/signup$`), []string{"POST"}, s.signUp, false},
-		{regexp.MustCompile(`^/refresh$`), []string{"POST"}, s.refresh, false},
+		{regexp.MustCompile(`^/refresh$`), []string{"POST"}, s.refresh, true},
+		{regexp.MustCompile(`^/logout$`), []string{"POST"}, s.logout, true},
 	}
 
 	hanFunc := func(w http.ResponseWriter, r *http.Request) {
@@ -178,6 +179,24 @@ func (s *Server) GetFile(w http.ResponseWriter, r *http.Request, paths []string,
 		return
 	}
 	l.LogV("File transfer done!")
+}
+
+func (s *Server) logout(w http.ResponseWriter, r *http.Request, paths []string, user string) {
+	l.LogV("Logout...")
+	status := s.auth.Logout(r)
+
+	if status != http.StatusOK {
+		switch status {
+		case http.StatusUnauthorized:
+			resp401(w)
+		case http.StatusBadRequest:
+			resp400(w)
+		case http.StatusInternalServerError:
+			resp500(w)
+		}
+		return
+	}
+	respOK(w, nil)
 }
 
 // Handler function for POST requests.

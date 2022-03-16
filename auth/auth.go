@@ -127,6 +127,37 @@ func (a *Auth) Authorize(w http.ResponseWriter, r *http.Request) string {
 	return fmt.Sprintf("%s", response)
 }
 
+func (a *Auth) Logout(r *http.Request) int {
+	cookie, err := r.Cookie("session_token")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			return http.StatusUnauthorized
+		}
+		return http.StatusBadRequest
+	}
+
+	userToken := cookie.Value
+
+	conn := a.cache.Get()
+	response, err := conn.Do("GET", userToken)
+	if err != nil {
+		conn.Close()
+		return http.StatusInternalServerError
+	}
+	if response == nil {
+		conn.Close()
+		return http.StatusUnauthorized
+	}
+
+	_, err = conn.Do("DEL", userToken)
+	conn.Close()
+	if err != nil {
+		return http.StatusInternalServerError
+	}
+
+	return http.StatusOK
+}
+
 func (a *Auth) Refresh(r *http.Request) (*http.Cookie, int) {
 	cookie, err := r.Cookie("session_token")
 	if err != nil {
