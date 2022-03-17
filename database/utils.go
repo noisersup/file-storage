@@ -92,6 +92,19 @@ func deleteFile(pool *pgxpool.Pool, ctx context.Context, tx pgx.Tx, pathNames []
 		return err
 	}
 
+	if f.IsDirectory {
+		childs, err := listDirectory(pool, f.Id)
+		if err != nil {
+			return err
+		}
+		for _, ch := range childs {
+			err = deleteFile(pool, ctx, tx, append(pathNames, ch.Name), root)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	if _, err = tx.Exec(ctx, "DELETE FROM file_tree WHERE id = $1;", f.Id); err != nil {
 		return err
 	}
@@ -102,6 +115,10 @@ func deleteFile(pool *pgxpool.Pool, ctx context.Context, tx pgx.Tx, pathNames []
 		filePath = fmt.Sprintf("./files/%s", f.Hash)
 	} else {
 		filePath = fmt.Sprintf("./files/%s%d", f.Hash, f.Duplicate)
+	}
+
+	if f.IsDirectory {
+		return nil
 	}
 
 	return os.Remove(filePath)
