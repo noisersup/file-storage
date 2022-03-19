@@ -6,4 +6,4 @@ RUN go mod download && go mod verify
 
 RUN go build -o fileStorage main.go
 
-CMD ["fileStorage"]
+CMD ["./fileStorage"]
