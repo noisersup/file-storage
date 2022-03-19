@@ -254,7 +254,7 @@ func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, paths []stri
 	err = s.db.DeleteFile(database.PathToArr(paths[0]), userRoot)
 	if err != nil {
 		l.Err(err.Error())
-		resp500(w)
+		resp404(w)
 		return
 	}
 }
