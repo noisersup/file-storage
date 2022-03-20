@@ -79,7 +79,14 @@ func (db *Database) createIfNotExists() {
 	);
 	`
 	for _, payload := range payloads {
-		db.pool.QueryRow(context.Background(), payload)
+		r := db.pool.QueryRow(context.Background(), payload)
+		err := r.Scan()
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				continue
+			}
+			l.Err(err.Error())
+		}
 	}
 }
 
