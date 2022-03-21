@@ -15,6 +15,4 @@ It takes your files, make them unreadable and place them next to other files loo
 ## Contributing
 I would love your help and suggestions in this project!
 
-Check my goals in [Roadmap](roadmap.md) 
-
-If you have idea that is not in roadmap do not be afraid to make an issue, each contribution is welcome.
+If you have an idea for this project do not be afraid to make an issue, each contribution is welcome.
