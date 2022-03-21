@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/noisersup/encryptedfs-api/logger"
 	"github.com/noisersup/encryptedfs-api/models"
 )
 
@@ -93,14 +94,15 @@ func deleteFile(pool *pgxpool.Pool, ctx context.Context, tx pgx.Tx, pathNames []
 	}
 
 	if f.IsDirectory {
-		childs, err := listDirectory(pool, f.Id)
-		if err != nil {
-			return err
-		}
+		childs, _ := listDirectory(pool, f.Id)
 		for _, ch := range childs {
 			err = deleteFile(pool, ctx, tx, append(pathNames, ch.Name), root)
 			if err != nil {
-				return err
+				if strings.Contains(err.Error(), "no such file or directory") {
+					logger.Warn(err.Error())
+				} else {
+					return err
+				}
 			}
 		}
 	}

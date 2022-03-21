@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/noisersup/encryptedfs-api/auth"
@@ -203,12 +204,6 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request, paths []string, 
 // Encrypts multipart file and store it in provided by user location
 func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []string, user string) {
 	l.LogV("Uploading file...")
-	reader, err := r.MultipartReader()
-	if err != nil {
-		l.Err(err.Error())
-		resp500(w)
-		return
-	}
 
 	key, err := s.db.GetKey(user)
 	if err != nil {
@@ -220,6 +215,32 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, args []strin
 	userRoot, err := s.db.GetRoot(user)
 	if err != nil {
 		l.Err("%s", err.Error())
+		resp500(w)
+		return
+	}
+
+	if !strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+		err = s.db.NewFile(database.PathToArr(args[0]), key, 0, true, userRoot)
+		if err != nil {
+			l.Err(err.Error())
+			if err == database.FileExists {
+				resp409(w)
+				return
+			}
+			if strings.Contains(err.Error(), "no path provided") {
+				resp400(w, "no path provided")
+				return
+			}
+			resp500(w)
+			return
+		}
+		resp201(w)
+		return
+	}
+
+	reader, err := r.MultipartReader()
+	if err != nil {
+		l.Err(err.Error())
 		resp500(w)
 		return
 	}
