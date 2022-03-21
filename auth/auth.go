@@ -19,12 +19,12 @@ type Auth struct {
 	db    models.Database
 }
 
-func InitAuth(userDb models.Database) (*Auth, error) {
+func InitAuth(userDb models.Database, redisHost string) (*Auth, error) {
 	pool := &redis.Pool{
 		MaxIdle:     3,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
-			c, err := redis.DialURL("redis://localhost")
+			c, err := redis.DialURL(fmt.Sprintf("redis://%s", redisHost))
 			if err != nil {
 				return nil, err
 			}

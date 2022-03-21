@@ -16,12 +16,14 @@ func main() {
 
 	dbName := getEnv("DB_NAME", "filestorage")
 	user := getEnv("DB_USER", "root")
-	host := getEnv("DB_HOST", "localhost")
+	dbHost := getEnv("DB_HOST", "localhost")
 	port := getEnv("DB_PORT", "26257")
+
+	cacheHost := getEnv("CACHE_HOST", "localhost")
 
 	l.Verbose = *v
 
-	dbPayload := fmt.Sprintf("postgresql://%s@%s:%s?sslmode=disable", user, host, port)
+	dbPayload := fmt.Sprintf("postgresql://%s@%s:%s?sslmode=disable", user, dbHost, port)
 
 	l.LogV("Connecting to database %s with payload: %s", dbName, dbPayload)
 
@@ -31,7 +33,7 @@ func main() {
 	}
 	defer db.Close()
 
-	if err = server.InitServer(db); err != nil {
+	if err = server.InitServer(db, cacheHost); err != nil {
 		l.Fatal(err.Error())
 	}
 }

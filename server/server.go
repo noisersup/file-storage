@@ -25,8 +25,8 @@ type Server struct {
 	filesPath string
 }
 
-func InitServer(db models.Database, filesPath ...string) error {
-	a, err := auth.InitAuth(db)
+func InitServer(db models.Database, cacheHost string, filesPath ...string) error {
+	a, err := auth.InitAuth(db, cacheHost)
 	if err != nil {
 		return err
 	}
