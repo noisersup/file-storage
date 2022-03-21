@@ -1,0 +1,152 @@
+html,body,#root {
+  height: 100%;
+}
+
+.App {
+  text-align: center;
+  background-color: red;
+  height: 100%;
+}
+
+.flex {
+  height:100%;
+  display:flex;
+  justify-content: center;
+  align-items: center;
+}
+
+td.size{
+    display: none;
+}
+
+td.modified{
+    display: none;
+}
+
+
+
+.filestorage{
+  height: 95%;
+  min-width: 400px;
+
+  width: 80%;
+
+  display:flex;
+  justify-content:center;
+  align-items: center;
+  flex-direction: column;
+
+  background-color: #fff;
+  border-radius: 15px;
+}
+
+.filestorage header{
+	width: 100%;
+	display: flex;
+	flex-direction: row-reverse;
+	justify-content: space-around;
+}
+
+
+.filestorage header span{
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	
+}
+
+.upload {
+  margin: 10px 0;
+}
+
+.rendered-react-keyed-file-browser {
+  height: 100%;
+  width: 100%;
+}
+
+.login {
+  height: 600px;
+  min-width: 400px;
+
+  width: 40%;
+
+  display:flex;
+  justify-content:center;
+  align-items: center;
+  flex-direction: column;
+
+  background-color: #fff;
+  border-radius: 15px;
+}
+
+.login form {
+  height: 100%;
+  width: 80%;
+
+
+  display:flex;
+  justify-content:center;
+  align-items: center;
+
+  flex-direction: column;
+}
+
+.login span {
+  width: 300px;
+  margin-top:10px;
+
+  display: flex; justify-content: flex-end;
+}
+
+.login button {
+  margin-top:10px;
+}
+
+.background-gradient {
+    background: linear-gradient(321deg, #00ffbd, #00e0ff);
+    background-size: 400% 400%;
+
+    -webkit-animation: background-anim 25s ease infinite;
+    -moz-animation: background-anim 25s ease infinite;
+    -o-animation: background-anim 25s ease infinite;
+    animation: background-anim 25s ease infinite;
+}
+
+@-webkit-keyframes background-anim {
+    0%{background-position:0% 9%}
+    50%{background-position:100% 92%}
+    100%{background-position:0% 9%}
+}
+@-moz-keyframes background-anim {
+    0%{background-position:0% 9%}
+    50%{background-position:100% 92%}
+    100%{background-position:0% 9%}
+}
+@-o-keyframes background-anim {
+    0%{background-position:0% 9%}
+    50%{background-position:100% 92%}
+    100%{background-position:0% 9%}
+}
+@keyframes background-anim {
+    0%{background-position:0% 9%}
+    50%{background-position:100% 92%}
+    100%{background-position:0% 9%}
+}
+
+
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
