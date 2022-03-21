@@ -32,7 +32,16 @@ services:
     environment:
       - DB_HOST=cockroach
       - DB_NAME=defaultdb
+      - CACHE_HOST=redis
     restart: always
+  frontend:
+    container_name: frontend
+    hostname: frontend
+    image: filestorage-frontend
+    networks:
+      - backend
+    ports:
+      - "3000:3000"
 
 networks:
   backend:
