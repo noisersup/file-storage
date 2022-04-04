@@ -1,4 +1,3 @@
-:warning: **This project is still in progress and does not meet 100% of its assumptions DO NOT use it to store any of your sensitive files** :warning:
 # :closed_lock_with_key: Encrypted File Server
 :file_folder:**Open source encrypted file server written for privacy and fun.**
 
