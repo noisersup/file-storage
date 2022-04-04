@@ -1,3 +1,4 @@
+![diagram][diagram]
 ![preview gif][preview]
 # :closed_lock_with_key: Encrypted File Server
 :file_folder:**Open source encrypted file server written for privacy and fun.**
@@ -17,4 +18,5 @@ I would love your help and suggestions in this project!
 
 If you have an idea for this project do not be afraid to make an issue, each contribution is welcome.
 
+[diagram]: ./diagram.png
 [preview]: ./filestorage.gif
