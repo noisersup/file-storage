@@ -1,3 +1,4 @@
+![preview gif][preview]
 # :closed_lock_with_key: Encrypted File Server
 :file_folder:**Open source encrypted file server written for privacy and fun.**
 
@@ -15,3 +16,5 @@ It takes your files, make them unreadable and place them next to other files loo
 I would love your help and suggestions in this project!
 
 If you have an idea for this project do not be afraid to make an issue, each contribution is welcome.
+
+[preview]: ./filestorage.gif
